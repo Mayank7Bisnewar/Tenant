@@ -1,3 +1,15 @@
+export interface PaymentRecord {
+  id: string;
+  date: string; // ISO date string
+  amount: number;
+  rentAmount: number;
+  electricityAmount: number;
+  waterAmount: number;
+  extraAmount: number;
+  electricityUnits: number;
+  billingMonth: string; // "January 2024"
+}
+
 export interface Tenant {
   id: string;
   name: string;
@@ -5,6 +17,7 @@ export interface Tenant {
   mobileNumber: string;
   monthlyRent: number;
   waterBill: number;
+  paymentHistory: PaymentRecord[];
   createdAt: string;
   updatedAt: string;
 }

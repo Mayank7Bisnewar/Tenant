@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { Tenant, BillData, AppState } from '@/types/tenant';
+import { PaymentRecord, Tenant, BillData, AppState } from '@/types/tenant';
 import { useTenants } from '@/hooks/useTenants';
 import { useOwnerInfo } from '@/hooks/useOwnerInfo';
 
@@ -11,6 +11,7 @@ interface BillingContextType {
   addTenant: (tenant: Omit<Tenant, 'id' | 'createdAt' | 'updatedAt'>) => Tenant;
   updateTenant: (id: string, updates: Partial<Omit<Tenant, 'id' | 'createdAt'>>) => void;
   deleteTenant: (id: string) => void;
+  addPaymentRecord: (tenantId: string, record: Omit<PaymentRecord, 'id'>) => void;
   selectedTenant: Tenant | null;
   selectTenant: (id: string | null) => void;
 
@@ -32,6 +33,7 @@ interface BillingContextType {
 
   // Bill generation
   generateBillData: () => BillData | null;
+  generateBillDataForTenant: (tenantId: string) => BillData | null;
   resetBill: () => void;
 }
 
@@ -43,19 +45,51 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
 
   // App state
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
-  const [electricityUnits, setElectricityUnits] = useState(0);
-  const [extraCharges, setExtraCharges] = useState(0);
-  const [billingDate, setBillingDate] = useState(new Date());
+
+  // Per-tenant billing state
+  const [billingState, setBillingState] = useState<Record<string, { electricityUnits: number; extraCharges: number; billingDate: Date }>>({});
 
   const selectedTenant = selectedTenantId ? getTenant(selectedTenantId) || null : null;
 
+  // Get current values or defaults
+  const currentBillingState = selectedTenantId ? billingState[selectedTenantId] || { electricityUnits: 0, extraCharges: 0, billingDate: new Date() } : { electricityUnits: 0, extraCharges: 0, billingDate: new Date() };
+
+  const electricityUnits = currentBillingState.electricityUnits;
+  const extraCharges = currentBillingState.extraCharges;
+  const billingDate = new Date(currentBillingState.billingDate); // Ensure Date object
+
+  const updateBillingState = useCallback((tenantId: string, updates: Partial<{ electricityUnits: number; extraCharges: number; billingDate: Date }>) => {
+    setBillingState(prev => ({
+      ...prev,
+      [tenantId]: {
+        ...(prev[tenantId] || { electricityUnits: 0, extraCharges: 0, billingDate: new Date() }),
+        ...updates
+      }
+    }));
+  }, []);
+
   const selectTenant = useCallback((id: string | null) => {
     setSelectedTenantId(id);
-    // Reset billing values when changing tenant
-    setElectricityUnits(0);
-    setExtraCharges(0);
-    setBillingDate(new Date());
+    // No need to reset; state is persisted in billingState map
   }, []);
+
+  const setElectricityUnits = useCallback((units: number) => {
+    if (selectedTenantId) {
+      updateBillingState(selectedTenantId, { electricityUnits: units });
+    }
+  }, [selectedTenantId, updateBillingState]);
+
+  const setExtraCharges = useCallback((charges: number) => {
+    if (selectedTenantId) {
+      updateBillingState(selectedTenantId, { extraCharges: charges });
+    }
+  }, [selectedTenantId, updateBillingState]);
+
+  const setBillingDate = useCallback((date: Date) => {
+    if (selectedTenantId) {
+      updateBillingState(selectedTenantId, { billingDate: date });
+    }
+  }, [selectedTenantId, updateBillingState]);
 
   // Calculated values
   const electricityCharges = electricityUnits * ELECTRICITY_RATE;
@@ -82,11 +116,49 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
     };
   }, [selectedTenant, electricityUnits, electricityCharges, extraCharges, totalAmount, billingDate]);
 
+  // Helper to generate bill data for ANY tenant, not just selected
+  const generateBillDataForTenant = useCallback((tenantId: string): BillData | null => {
+    const tenant = getTenant(tenantId);
+    if (!tenant) return null;
+
+    const state = billingState[tenantId] || { electricityUnits: 0, extraCharges: 0, billingDate: new Date() };
+    const elecCharges = state.electricityUnits * ELECTRICITY_RATE;
+    const total = tenant.monthlyRent + elecCharges + tenant.waterBill + state.extraCharges;
+
+    return {
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      roomNumber: tenant.roomNumber,
+      mobileNumber: tenant.mobileNumber,
+      monthlyRent: tenant.monthlyRent,
+      electricityUnits: state.electricityUnits,
+      electricityRate: ELECTRICITY_RATE,
+      electricityCharges: elecCharges,
+      waterBill: tenant.waterBill,
+      extraCharges: state.extraCharges,
+      totalAmount: total,
+      billingDate: new Date(state.billingDate),
+    };
+  }, [getTenant, billingState]);
+
+  const addPaymentRecord = useCallback((tenantId: string, record: Omit<PaymentRecord, 'id'>) => {
+    const tenant = getTenant(tenantId);
+    if (!tenant) return;
+
+    const newRecord: PaymentRecord = {
+      ...record,
+      id: crypto.randomUUID(),
+    };
+
+    const updatedHistory = [...(tenant.paymentHistory || []), newRecord];
+    updateTenant(tenantId, { paymentHistory: updatedHistory });
+  }, [getTenant, updateTenant]);
+
   const resetBill = useCallback(() => {
-    setElectricityUnits(0);
-    setExtraCharges(0);
-    setBillingDate(new Date());
-  }, []);
+    if (selectedTenantId) {
+      updateBillingState(selectedTenantId, { electricityUnits: 0, extraCharges: 0, billingDate: new Date() });
+    }
+  }, [selectedTenantId, updateBillingState]);
 
   return (
     <BillingContext.Provider
@@ -95,6 +167,7 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         addTenant,
         updateTenant,
         deleteTenant,
+        addPaymentRecord,
         selectedTenant,
         selectTenant,
         electricityUnits,
@@ -108,6 +181,7 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         ownerInfo,
         setOwnerInfo,
         generateBillData,
+        generateBillDataForTenant, // Expose new helper
         resetBill,
       }}
     >
