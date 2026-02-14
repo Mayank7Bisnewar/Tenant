@@ -40,6 +40,10 @@ npx cap sync android
 Navigate to the android directory and run the Gradle build.
 ```bash
 cd android
+
+Create the configuration file(First time setup)
+echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties
+
 # Note: Requires Java 21
 JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home ./gradlew assembleDebug
 ```
