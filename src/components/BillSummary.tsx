@@ -1,29 +1,38 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { MessageSquare, IndianRupee, Home, Zap, Droplets, PlusCircle, Calendar, User, Settings } from 'lucide-react';
+import { MessageSquare, IndianRupee, Home, Zap, Droplets, PlusCircle, Calendar, User, Settings, CheckSquare, History, Save } from 'lucide-react';
 import { useBilling } from '@/context/BillingContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { BillData } from '@/types/tenant';
+import { HistoryView } from '@/components/HistoryView';
+import { GoogleSheetsService } from '@/services/GoogleSheetsService';
+import { useToast } from '@/hooks/use-toast';
 
 export function BillSummary() {
-  const { 
-    selectedTenant, 
-    electricityUnits, 
-    electricityCharges, 
-    extraCharges, 
-    totalAmount,
-    billingDate,
+  const {
+    tenants,
     ownerInfo,
     setOwnerInfo,
-    generateBillData,
+    generateBillDataForTenant,
+    addPaymentRecord,
   } = useBilling();
+  const { toast } = useToast();
 
-  const [localOwnerInfo, setLocalOwnerInfo] = React.useState(ownerInfo);
-  const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
+  const [localOwnerInfo, setLocalOwnerInfo] = useState(ownerInfo);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [sheetsUrl, setSheetsUrl] = useState(GoogleSheetsService.getScriptUrl());
+
+  // Selection state
+  const [selectedTenantIds, setSelectedTenantIds] = useState<Set<string>>(new Set());
+  const [isSendingModalOpen, setIsSendingModalOpen] = useState(false);
+  const [historyTenantId, setHistoryTenantId] = useState<string | null>(null);
 
   // Sync local state with context when dialog opens
   React.useEffect(() => {
@@ -34,52 +43,153 @@ export function BillSummary() {
 
   const handleSaveOwnerInfo = () => {
     setOwnerInfo(localOwnerInfo);
+    GoogleSheetsService.setScriptUrl(sheetsUrl);
     setIsSettingsOpen(false);
+    toast({ title: 'Settings saved successfully' });
   };
 
-  const handleWhatsAppSend = () => {
-    const billData = generateBillData();
+  const handleRecordPayment = async (tenantId: string) => {
+    const billData = generateBillDataForTenant(tenantId);
     if (!billData) return;
 
+    const tenant = tenants.find(t => t.id === tenantId);
+    if (!tenant) return;
+
+    const billingMonth = format(billData.billingDate, 'MMMM yyyy');
+
+    // Check if payment already exists for this month
+    const existingPayment = tenant.paymentHistory?.find(
+      record => record.billingMonth === billingMonth
+    );
+
+    if (existingPayment) {
+      toast({
+        title: 'Payment already recorded',
+        description: `A payment for ${billingMonth} already exists.`,
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const paymentRecord = {
+      date: new Date().toISOString(),
+      amount: billData.totalAmount,
+      rentAmount: billData.monthlyRent,
+      electricityAmount: billData.electricityCharges,
+      waterAmount: billData.waterBill,
+      extraAmount: billData.extraCharges,
+      electricityUnits: billData.electricityUnits,
+      billingMonth: billingMonth,
+    };
+
+    // Save to local history
+    addPaymentRecord(tenantId, paymentRecord);
+
+    // Send to Google Sheets if configured
+    const scriptUrl = GoogleSheetsService.getScriptUrl();
+    if (scriptUrl) {
+      try {
+        await GoogleSheetsService.appendRow({
+          billedDate: format(billData.billingDate, 'dd/MM/yyyy'),
+          paidDate: format(new Date(), 'dd/MM/yyyy'),
+          tenantName: billData.tenantName,
+          roomNo: billData.roomNumber,
+          rent: billData.monthlyRent,
+          electricityUnits: billData.electricityUnits,
+          electricityAmount: billData.electricityCharges,
+          waterAmount: billData.waterBill,
+          extraAmount: billData.extraCharges,
+          totalAmount: billData.totalAmount,
+          remarks: '',
+        });
+        toast({ title: 'Payment recorded and synced to Google Sheets' });
+      } catch (error) {
+        console.error('Sheets sync error:', error);
+        toast({
+          title: 'Payment recorded locally',
+          description: 'Failed to sync to Google Sheets. Check console for details.',
+          variant: 'destructive'
+        });
+      }
+    } else {
+      toast({ title: 'Payment recorded locally' });
+    }
+  };
+
+  // Toggle selection
+  const toggleTenant = (id: string, checked: boolean) => {
+    const newSelected = new Set(selectedTenantIds);
+    if (checked) {
+      newSelected.add(id);
+    } else {
+      newSelected.delete(id);
+    }
+    setSelectedTenantIds(newSelected);
+  };
+
+  const toggleAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedTenantIds(new Set(tenants.map(t => t.id)));
+    } else {
+      setSelectedTenantIds(new Set());
+    }
+  };
+
+  // Calculate totals for selected
+  const selectedTotal = useMemo(() => {
+    let total = 0;
+    selectedTenantIds.forEach(id => {
+      const data = generateBillDataForTenant(id);
+      if (data) total += data.totalAmount;
+    });
+    return total;
+  }, [selectedTenantIds, generateBillDataForTenant]);
+
+  const getWhatsappLink = (billData: BillData) => {
     const formattedDate = format(billData.billingDate, 'MMMM yyyy');
-    
+
     let message = `Hello ${billData.tenantName},\n\n`;
     message += `Here are the bill details for ${formattedDate}:\n\n`;
-    message += `🏠 Room Rent: ₹${billData.monthlyRent.toLocaleString()}\n`;
-    message += `⚡ Electricity Used: ${billData.electricityUnits} units\n`;
-    message += `💡 Electricity Charges: ₹${billData.electricityCharges.toLocaleString()}\n`;
-    message += `🚰 Water Bill: ₹${billData.waterBill.toLocaleString()}\n`;
-    
+    // message += `Room Rent: ₹${billData.monthlyRent.toLocaleString()}\n`;
+    // message += `Electricity Used: ${billData.electricityUnits} units\n`;
+    // message += `Electricity Charges: ₹${billData.electricityCharges.toLocaleString()}\n`;
+    // message += `Water Bill: ₹${billData.waterBill.toLocaleString()}\n`;
+
     if (billData.extraCharges > 0) {
-      message += `➕ Extra Charges: ₹${billData.extraCharges.toLocaleString()}\n`;
+      message += `Extra Charges: ₹${billData.extraCharges.toLocaleString()}\n`;
     }
-    
-    message += `\n💰 *Total Payable Amount: ₹${billData.totalAmount.toLocaleString()}*\n`;
-    
+
+    message += `\n *Total Payable Amount: ₹${billData.totalAmount.toLocaleString()}*\n`;
+
     if (ownerInfo.name || ownerInfo.upiId || ownerInfo.mobileNumber) {
       message += `\n---\n`;
       if (ownerInfo.name) message += `Owner Name: ${ownerInfo.name}\n`;
       if (ownerInfo.upiId) message += `UPI ID: ${ownerInfo.upiId}\n`;
       if (ownerInfo.mobileNumber) message += `Mobile: ${ownerInfo.mobileNumber}\n`;
     }
-    
-    message += `\nThank you.`;
+
+    message += `\n*Please ensure the surroundings and toilets are kept clean. Let’s maintain hygiene together. Thank you.*`;
 
     const encodedMessage = encodeURIComponent(message);
     const phoneNumber = billData.mobileNumber.replace(/\D/g, '');
-    const whatsappUrl = `https://wa.me/91${phoneNumber}?text=${encodedMessage}`;
-    
-    window.open(whatsappUrl, '_blank');
+    return `whatsapp://send?phone=91${phoneNumber}&text=${encodedMessage}`;
   };
 
-  if (!selectedTenant) {
+  const handleSendClick = (tenantId: string) => {
+    const data = generateBillDataForTenant(tenantId);
+    if (data) {
+      window.open(getWhatsappLink(data), '_blank');
+    }
+  };
+
+  if (tenants.length === 0) {
     return (
       <div className="animate-fade-in">
         <Card className="shadow-card border-dashed border-2">
           <CardContent className="py-12 text-center">
             <MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-            <p className="text-muted-foreground font-medium">No tenant selected</p>
-            <p className="text-sm text-muted-foreground mt-1">Select a tenant to generate bill</p>
+            <p className="text-muted-foreground font-medium">No tenants found</p>
+            <p className="text-sm text-muted-foreground mt-1">Add tenants to generate bills</p>
           </CardContent>
         </Card>
       </div>
@@ -87,14 +197,14 @@ export function BillSummary() {
   }
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      {/* Bill Summary Card */}
+    <div className="space-y-4 animate-fade-in pb-20">
+      {/* Header Card */}
       <Card className="shadow-card overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-primary to-primary-dark text-primary-foreground">
+        <CardHeader className="bg-gradient-to-r from-primary to-primary-dark text-primary-foreground pb-4">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 font-display">
-              <IndianRupee className="w-5 h-5" />
-              Bill Summary
+              <CheckSquare className="w-5 h-5" />
+              Select Tenants
             </CardTitle>
             <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
               <DialogTrigger asChild>
@@ -134,6 +244,51 @@ export function BillSummary() {
                       onChange={(e) => setLocalOwnerInfo({ ...localOwnerInfo, upiId: e.target.value })}
                     />
                   </div>
+                  <div className="space-y-2 pt-4 border-t">
+                    <Label htmlFor="sheetsUrl">Google Sheets Script URL (Optional)</Label>
+                    <Input
+                      id="sheetsUrl"
+                      placeholder="https://script.google.com/..."
+                      value={sheetsUrl}
+                      onChange={(e) => setSheetsUrl(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">For automatic sync to Google Sheets</p>
+                    {sheetsUrl && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            console.log('Testing connection to:', sheetsUrl);
+                            await GoogleSheetsService.appendRow({
+                              billedDate: '01/01/2024',
+                              paidDate: '01/01/2024',
+                              tenantName: 'TEST',
+                              roomNo: 'TEST',
+                              rent: 0,
+                              electricityUnits: 0,
+                              electricityAmount: 0,
+                              waterAmount: 0,
+                              extraAmount: 0,
+                              totalAmount: 0,
+                              remarks: 'Connection Test',
+                            });
+                            toast({ title: 'Test successful! Check your sheet for a TEST row.' });
+                          } catch (error) {
+                            console.error('Test failed:', error);
+                            toast({
+                              title: 'Test failed',
+                              description: 'Check browser console for details',
+                              variant: 'destructive'
+                            });
+                          }
+                        }}
+                      >
+                        Test Connection
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <DialogFooter>
                   <DialogClose asChild>
@@ -145,94 +300,159 @@ export function BillSummary() {
             </Dialog>
           </div>
         </CardHeader>
-        <CardContent className="pt-4">
-          {/* Tenant Info */}
-          <div className="flex items-center gap-3 pb-4 border-b">
-            <div className="w-10 h-10 rounded-full bg-primary-light flex items-center justify-center">
-              <User className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <p className="font-semibold">{selectedTenant.name}</p>
-              {selectedTenant.roomNumber && (
-                <p className="text-sm text-muted-foreground">{selectedTenant.roomNumber}</p>
-              )}
-            </div>
+
+        {/* Select All Bar */}
+        <div className="px-4 py-3 bg-muted/50 border-b flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="select-all"
+              checked={selectedTenantIds.size === tenants.length && tenants.length > 0}
+              onCheckedChange={(checked) => toggleAll(checked as boolean)}
+            />
+            <Label htmlFor="select-all" className="cursor-pointer font-medium">Select All</Label>
           </div>
+          <span className="text-sm text-muted-foreground">
+            {selectedTenantIds.size} selected
+          </span>
+        </div>
 
-          {/* Billing Date */}
-          <div className="flex items-center justify-between py-3 border-b">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Calendar className="w-4 h-4" />
-              <span className="text-sm">Billing Date</span>
+        {/* Tenant List */}
+        <CardContent className="p-0">
+          <ScrollArea className="h-[400px]">
+            <div className="divide-y divide-border">
+              {tenants.map((tenant) => {
+                const billData = generateBillDataForTenant(tenant.id);
+                if (!billData) return null;
+
+                return (
+                  <div key={tenant.id} className="flex items-center gap-3 p-4 hover:bg-muted/30 transition-colors">
+                    <Checkbox
+                      id={`tenant-${tenant.id}`}
+                      checked={selectedTenantIds.has(tenant.id)}
+                      onCheckedChange={(checked) => toggleTenant(tenant.id, checked as boolean)}
+                    />
+                    <div className="flex-1 min-w-0 grid gap-1">
+                      <Label htmlFor={`tenant-${tenant.id}`} className="font-semibold cursor-pointer truncate">
+                        {tenant.name}
+                      </Label>
+                      <div className="flex text-xs text-muted-foreground gap-3">
+                        <span className="flex items-center gap-1">
+                          <Home className="w-3 h-3" /> {tenant.monthlyRent.toLocaleString()}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Zap className="w-3 h-3" /> ₹{billData.electricityCharges}
+                        </span>
+                        {billData.extraCharges > 0 && (
+                          <span className="flex items-center gap-1 text-extra">
+                            <PlusCircle className="w-3 h-3" /> ₹{billData.extraCharges}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setHistoryTenantId(tenant.id);
+                        }}
+                      >
+                        <History className="w-4 h-4" />
+                      </Button>
+                      <div className="font-bold text-primary">
+                        ₹{billData.totalAmount.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <span className="font-medium">{format(billingDate, 'dd MMM yyyy')}</span>
-          </div>
-
-          {/* Bill Items */}
-          <div className="space-y-3 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Home className="w-4 h-4 text-rent" />
-                <span>Room Rent</span>
-              </div>
-              <span className="font-medium">₹{selectedTenant.monthlyRent.toLocaleString()}</span>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-electricity" />
-                <span>Electricity ({electricityUnits} units)</span>
-              </div>
-              <span className="font-medium">₹{electricityCharges.toLocaleString()}</span>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Droplets className="w-4 h-4 text-water" />
-                <span>Water Bill</span>
-              </div>
-              <span className="font-medium">₹{selectedTenant.waterBill.toLocaleString()}</span>
-            </div>
-
-            {extraCharges > 0 && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <PlusCircle className="w-4 h-4 text-extra" />
-                  <span>Extra Charges</span>
-                </div>
-                <span className="font-medium">₹{extraCharges.toLocaleString()}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Total */}
-          <div className="flex items-center justify-between pt-4 border-t">
-            <span className="text-lg font-semibold">Total Amount</span>
-            <div className="flex items-center gap-1 text-2xl font-bold text-primary">
-              <IndianRupee className="w-6 h-6" />
-              <span>{totalAmount.toLocaleString()}</span>
-            </div>
-          </div>
+          </ScrollArea>
         </CardContent>
+
+        {/* Footer Actions */}
+        <div className="p-4 border-t bg-card">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm font-medium text-muted-foreground">Total Receivable</span>
+            <span className="text-2xl font-bold text-foreground">₹{selectedTotal.toLocaleString()}</span>
+          </div>
+          <Button
+            className="w-full h-12 text-base font-semibold shadow-md bg-[#25D366] hover:bg-[#128C7E] text-white"
+            disabled={selectedTenantIds.size === 0}
+            onClick={() => setIsSendingModalOpen(true)}
+          >
+            <MessageSquare className="w-5 h-5 mr-2" />
+            Send {selectedTenantIds.size} Bills
+          </Button>
+        </div>
       </Card>
 
-      {/* WhatsApp Send Button */}
-      <Button 
-        className={cn(
-          "w-full h-14 text-lg font-semibold gap-3",
-          "bg-[#25D366] hover:bg-[#128C7E] text-white",
-          "shadow-lg hover:shadow-xl transition-all duration-200"
-        )}
-        onClick={handleWhatsAppSend}
-      >
-        <MessageSquare className="w-6 h-6" />
-        Send Bill via WhatsApp
-      </Button>
+      {/* Sending Modal */}
+      <Dialog open={isSendingModalOpen} onOpenChange={setIsSendingModalOpen}>
+        <DialogContent className="sm:max-w-md h-[80vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle>Send Bills</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Click send for each tenant to open WhatsApp
+            </p>
+          </DialogHeader>
+          <ScrollArea className="flex-1 px-6">
+            <div className="space-y-4 py-4">
+              {Array.from(selectedTenantIds).map(id => {
+                const tenant = tenants.find(t => t.id === id);
+                const data = generateBillDataForTenant(id);
+                if (!tenant || !data) return null;
 
-      {/* Info */}
-      <p className="text-xs text-center text-muted-foreground">
-        Opens WhatsApp with a pre-filled message for {selectedTenant.name}
-      </p>
+                return (
+                  <div key={id} className="flex items-center justify-between p-3 border rounded-lg bg-card shadow-sm">
+                    <div>
+                      <p className="font-medium">{tenant.name}</p>
+                      <p className="text-sm text-muted-foreground">₹{data.totalAmount.toLocaleString()}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRecordPayment(id)}
+                      >
+                        <Save className="w-4 h-4 mr-1.5" /> Record
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="bg-[#25D366] hover:bg-[#128C7E] text-white"
+                        onClick={() => handleSendClick(id)}
+                      >
+                        Send <MessageSquare className="w-4 h-4 ml-1.5" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </ScrollArea>
+          <DialogFooter className="p-6 pt-2 border-t">
+            <DialogClose asChild>
+              <Button variant="secondary" className="w-full">Done</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* History Dialog */}
+      <Dialog open={!!historyTenantId} onOpenChange={(open) => !open && setHistoryTenantId(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {historyTenantId && tenants.find(t => t.id === historyTenantId)?.name} - Payment History
+            </DialogTitle>
+          </DialogHeader>
+          {historyTenantId && (
+            <HistoryView tenant={tenants.find(t => t.id === historyTenantId)!} />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

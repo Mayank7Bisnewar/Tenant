@@ -9,13 +9,8 @@ interface Tab {
 }
 
 const tabs: Tab[] = [
-  { id: 'tenant', label: 'Tenant', icon: <User className="w-5 h-5" /> },
-  { id: 'rent', label: 'Rent', icon: <Home className="w-5 h-5" /> },
-  { id: 'electricity', label: 'Electric', icon: <Zap className="w-5 h-5" /> },
-  { id: 'water', label: 'Water', icon: <Droplets className="w-5 h-5" /> },
-  { id: 'extra', label: 'Extra', icon: <PlusCircle className="w-5 h-5" /> },
-  { id: 'date', label: 'Date', icon: <Calendar className="w-5 h-5" /> },
-  { id: 'send', label: 'Send', icon: <Send className="w-5 h-5" /> },
+  { id: 'tenant', label: 'Tenants', icon: <User className="w-5 h-5" /> },
+  { id: 'send', label: 'Summary', icon: <Send className="w-5 h-5" /> },
 ];
 
 interface BottomNavigationProps {
