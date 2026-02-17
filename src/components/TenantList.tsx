@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, User, Phone, Home, Droplets, IndianRupee, Pencil, Trash2, Check, X, Zap, Calendar, FileText, Contact } from 'lucide-react';
+import { Plus, User, Phone, Home, Droplets, IndianRupee, Pencil, Trash2, Check, X, Zap, Calendar, FileText, Contact, GripVertical, GripHorizontal, Edit2 } from 'lucide-react';
 import { Contacts } from '@capacitor-community/contacts';
 import { useBilling } from '@/context/BillingContext';
 import { Button } from '@/components/ui/button';
@@ -13,215 +13,227 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Tenant } from '@/types/tenant';
+import { motion, AnimatePresence, Reorder, useDragControls } from 'framer-motion';
 
-interface TenantFormData {
-  name: string;
-  roomNumber: string;
-  mobileNumber: string;
-  monthlyRent: string;
-  waterBill: string;
-}
+import { TenantForm, TenantFormData } from '@/components/TenantForm';
 
-const emptyFormData: TenantFormData = {
-  name: '',
-  roomNumber: '',
-  mobileNumber: '',
-  monthlyRent: '',
-  waterBill: '',
-};
-
-function TenantForm({
-  initialData,
-  onSubmit,
-  onCancel,
-  submitLabel = 'Add Tenant'
+// Sub-component for individual Tenant Item to handle drag controls properly
+function TenantItem({
+  tenant,
+  isSelected,
+  onSelect,
+  onEdit,
+  onDelete,
+  electricityUnits,
+  extraCharges,
+  onUpdateElectricity,
+  onUpdateExtraCharges
 }: {
-  initialData?: Tenant;
-  onSubmit: (data: TenantFormData) => void;
-  onCancel: () => void;
-  submitLabel?: string;
+  tenant: Tenant,
+  isSelected: boolean,
+  onSelect: () => void,
+  onEdit: () => void,
+  onDelete: () => void,
+  electricityUnits: number,
+  extraCharges: number,
+  onUpdateElectricity: (units: number) => void,
+  onUpdateExtraCharges: (amount: number) => void
 }) {
-  const [formData, setFormData] = useState<TenantFormData>(
-    initialData
-      ? {
-        name: initialData.name,
-        roomNumber: initialData.roomNumber,
-        mobileNumber: initialData.mobileNumber,
-        monthlyRent: String(initialData.monthlyRent),
-        waterBill: String(initialData.waterBill),
-      }
-      : emptyFormData
-  );
-
-  const [errors, setErrors] = useState<Partial<TenantFormData>>({});
-
-  const validate = () => {
-    const newErrors: Partial<TenantFormData> = {};
-    if (!formData.name.trim()) newErrors.name = 'Name is required';
-    if (!formData.mobileNumber.trim()) {
-      newErrors.mobileNumber = 'Mobile number is required';
-    } else if (!/^\d{10}$/.test(formData.mobileNumber.replace(/\s/g, ''))) {
-      newErrors.mobileNumber = 'Enter valid 10-digit number';
-    }
-    if (!formData.monthlyRent || parseFloat(formData.monthlyRent) < 0) {
-      newErrors.monthlyRent = 'Enter valid rent amount';
-    }
-    if (!formData.waterBill || parseFloat(formData.waterBill) < 0) {
-      newErrors.waterBill = 'Enter valid water bill';
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (validate()) {
-      onSubmit(formData);
-    }
-  };
+  const controls = useDragControls();
+  const electricityCharges = electricityUnits * 12;
+  const totalAmount = tenant.monthlyRent + electricityCharges + tenant.waterBill + extraCharges;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="name" className="flex items-center gap-2">
-          <User className="w-4 h-4 text-muted-foreground" />
-          Tenant Name
-        </Label>
-        <Input
-          id="name"
-          placeholder="Enter tenant name"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          className={cn(errors.name && 'border-destructive')}
-        />
-        {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
-      </div>
+    <Reorder.Item
+      value={tenant}
+      id={tenant.id}
+      dragListener={false}
+      dragControls={controls}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      whileDrag={{
+        scale: 1.02,
+        boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
+        zIndex: 50
+      }}
+      className="list-none"
+    >
+      <Card
+        className={cn(
+          'shadow-sm border-none transition-all duration-200 rounded-2xl bg-card cursor-pointer relative overflow-hidden',
+          isSelected
+            ? 'ring-2 ring-primary bg-primary/[0.02]'
+            : 'hover:shadow-md active:scale-[0.99]'
+        )}
+        onClick={onSelect}
+      >
+        <CardContent className="p-5">
+          <div className="flex items-start justify-between gap-2">
+            {/* Drag Handle - Left Side */}
+            {/* Drag Handle - Left Side */}
+            <div
+              className="flex-none self-center p-2 -ml-2 text-primary/40 hover:text-primary transition-colors cursor-grab active:cursor-grabbing z-10 touch-none"
+              onPointerDown={(e) => {
+                controls.start(e);
+              }}
+            >
+              <GripVertical className="w-6 h-6" />
+            </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="roomNumber" className="flex items-center gap-2">
-          <Home className="w-4 h-4 text-muted-foreground" />
-          Room / Flat Number
-        </Label>
-        <Input
-          id="roomNumber"
-          placeholder="e.g., Room 101"
-          value={formData.roomNumber}
-          onChange={(e) => setFormData({ ...formData, roomNumber: e.target.value })}
-        />
-      </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-3 mb-1">
+                <div className={cn(
+                  "w-10 h-10 rounded-xl flex items-center justify-center transition-colors flex-none",
+                  isSelected ? "bg-primary text-white" : "bg-primary/10 text-primary"
+                )}>
+                  <User className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-foreground text-base truncate leading-tight">{tenant.name}</h3>
+                  {tenant.roomNumber && (
+                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider flex items-center gap-1">
+                      Room {tenant.roomNumber}
+                    </p>
+                  )}
+                </div>
+              </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="mobileNumber" className="flex items-center gap-2">
-          <Phone className="w-4 h-4 text-muted-foreground" />
-          Mobile Number (WhatsApp)
-        </Label>
-        <div className="flex gap-2">
-          <Input
-            id="mobileNumber"
-            type="tel"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            placeholder="10-digit mobile number"
-            value={formData.mobileNumber}
-            onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-            className={cn(errors.mobileNumber && 'border-destructive')}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={async () => {
-              try {
-                const permission = await Contacts.requestPermissions();
-                if (permission.contacts !== 'granted') return;
+              {!isSelected && (
+                <div className="flex items-center gap-4 text-sm font-bold pl-[52px]">
+                  <div className="flex items-center gap-1.5 text-primary">
+                    <Home className="w-4 h-4" /> ₹{tenant.monthlyRent.toLocaleString()}
+                  </div>
+                  {electricityUnits > 0 && (
+                    <div className="flex items-center gap-1.5 text-electricity">
+                      <Zap className="w-4 h-4" /> ₹{electricityCharges.toLocaleString()}
+                    </div>
+                  )}
+                  {/* {extraCharges > 0 && (
+                    <div className="flex items-center gap-1.5 text-amber-500">
+                      <Plus className="w-4 h-4" /> ₹{extraCharges.toLocaleString()}
+                    </div>
+                  )} */}
+                  {tenant.waterBill > 0 && (
+                    <div className="flex items-center gap-1.5 text-water">
+                      <Droplets className="w-4 h-4" /> ₹{tenant.waterBill.toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
-                const result = await Contacts.pickContact({
-                  projection: {
-                    name: true,
-                    phones: true,
-                  },
-                });
+            <div className="flex gap-1 flex-none self-start">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+              >
+                <Edit2 className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
 
-                if (result.contact) {
-                  let phone = '';
-                  if (result.contact.phones && result.contact.phones.length > 0) {
-                    // Get the last 10 digits
-                    phone = result.contact.phones[0].number?.replace(/\D/g, '').slice(-10) || '';
-                  }
+          <AnimatePresence>
+            {isSelected && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="pt-4 mt-4 border-t border-border/50">
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="bg-muted/30 p-3 rounded-xl">
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase mb-1">Mobile</p>
+                      <p className="text-sm font-bold flex items-center gap-2">
+                        <Phone className="w-3.5 h-3.5 text-primary" /> {tenant.mobileNumber}
+                      </p>
+                    </div>
+                    <div className="bg-muted/30 p-3 rounded-xl">
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase mb-1">Monthly Rent</p>
+                      <p className="text-sm font-bold">₹{tenant.monthlyRent.toLocaleString()}</p>
+                    </div>
+                  </div>
 
-                  let name = formData.name;
-                  if (result.contact.name && !name) {
-                    name = result.contact.name.display || '';
-                  }
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1.5 ml-1">
+                          <Zap className="w-3 h-3 text-electricity" /> Electricity Units
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            placeholder="Units"
+                            className="w-full h-11 px-4 pr-12 rounded-xl bg-muted/30 border-none font-bold focus:ring-2 focus:ring-primary/20 transition-all font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            value={electricityUnits || ''}
+                            onChange={(e) => onUpdateElectricity(parseFloat(e.target.value) || 0)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          {electricityUnits > 0 && (
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-electricity bg-electricity/10 px-1.5 py-0.5 rounded">
+                              ₹{electricityCharges}
+                            </div>
+                          )}
+                        </div>
+                      </div>
 
-                  setFormData(prev => ({
-                    ...prev,
-                    mobileNumber: phone,
-                    name: name
-                  }));
-                }
-              } catch (e) {
-                console.error("Error picking contact", e);
-              }
-            }}
-          >
-            <Contact className="w-4 h-4" />
-          </Button>
-        </div>
-        {errors.mobileNumber && <p className="text-sm text-destructive">{errors.mobileNumber}</p>}
-      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1.5 ml-1">
+                          <Plus className="w-3 h-3 text-amber-500" /> Extra Charges
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            placeholder="Amount"
+                            className="w-full h-11 px-4 pr-12 rounded-xl bg-muted/30 border-none font-bold focus:ring-2 focus:ring-primary/20 transition-all font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            value={extraCharges || ''}
+                            onChange={(e) => onUpdateExtraCharges(parseFloat(e.target.value) || 0)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          {extraCharges > 0 && (
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                              ₹{extraCharges}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="monthlyRent" className="flex items-center gap-2">
-            <IndianRupee className="w-4 h-4 text-muted-foreground" />
-            Monthly Rent
-          </Label>
-          <Input
-            id="monthlyRent"
-            type="number"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            min="0"
-            placeholder="₹0"
-            value={formData.monthlyRent}
-            onChange={(e) => setFormData({ ...formData, monthlyRent: e.target.value.replace(/\D/g, '') })}
-            className={cn(errors.monthlyRent && 'border-destructive')}
-          />
-          {errors.monthlyRent && <p className="text-sm text-destructive">{errors.monthlyRent}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="waterBill" className="flex items-center gap-2">
-            <Droplets className="w-4 h-4 text-muted-foreground" />
-            Water Bill
-          </Label>
-          <Input
-            id="waterBill"
-            type="number"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            min="0"
-            placeholder="₹0"
-            value={formData.waterBill}
-            onChange={(e) => setFormData({ ...formData, waterBill: e.target.value.replace(/\D/g, '') })}
-            className={cn(errors.waterBill && 'border-destructive')}
-          />
-          {errors.waterBill && <p className="text-sm text-destructive">{errors.waterBill}</p>}
-        </div>
-      </div>
-
-      <DialogFooter className="gap-2 pt-4">
-        <DialogClose asChild>
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-        </DialogClose>
-        <Button type="submit" className="bg-primary hover:bg-primary-dark">
-          {submitLabel}
-        </Button>
-      </DialogFooter>
-    </form>
+                    <Button
+                      className="w-full h-12 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-md transition-all active:scale-[0.98]"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelect();
+                      }}
+                    >
+                      Generate Bill (₹{totalAmount.toLocaleString()})
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </CardContent>
+      </Card>
+    </Reorder.Item>
   );
 }
 
@@ -233,14 +245,10 @@ export function TenantList({ onNavigateToSummary }: { onNavigateToSummary?: () =
     deleteTenant,
     selectedTenant,
     selectTenant,
-    electricityUnits,
+    reorderTenants,
+    getTenantBillingState,
     setElectricityUnits,
-    extraCharges,
-    setExtraCharges,
-    billingDate,
-    setBillingDate,
-    electricityCharges,
-    totalAmount
+    setExtraCharges
   } = useBilling();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
@@ -279,11 +287,11 @@ export function TenantList({ onNavigateToSummary }: { onNavigateToSummary?: () =
   };
 
   return (
-    <div className="space-y-4 animate-fade-in pb-20">
-      {/* Add Tenant Button */}
+    <div className="flex-1 flex flex-col min-h-0 py-4 gap-6 overflow-hidden">
+      {/* Add Tenant Button - Fixed */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogTrigger asChild>
-          <Button className="w-full gap-2 bg-primary hover:bg-primary-dark h-12 text-base font-medium shadow-md">
+          <Button className="flex-none w-full gap-2 bg-primary hover:bg-primary-dark h-11 text-base font-bold shadow-md rounded-xl transition-all active:scale-[0.98]">
             <Plus className="w-5 h-5" />
             Add New Tenant
           </Button>
@@ -299,238 +307,67 @@ export function TenantList({ onNavigateToSummary }: { onNavigateToSummary?: () =
         </DialogContent>
       </Dialog>
 
-      {/* Tenant List */}
-      {tenants.length === 0 ? (
-        <Card className="shadow-card border-dashed border-2">
-          <CardContent className="py-8 text-center">
-            <User className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-            <p className="text-muted-foreground">No tenants added yet</p>
-            <p className="text-sm text-muted-foreground">Add your first tenant to get started</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {tenants.map((tenant) => {
-            const isSelected = selectedTenant?.id === tenant.id;
+      {/* Tenant List - Scrollable Area */}
+      <div className="flex-1 overflow-y-auto pt-2 pb-6 px-0.5">
+        {tenants.length === 0 ? (
+          <Card className="shadow-card border-dashed border-2">
+            <CardContent className="py-12 text-center">
+              <User className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+              <p className="text-muted-foreground font-medium">No tenants added yet</p>
+              <p className="text-sm text-muted-foreground mt-1">Add your first tenant to get started</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Reorder.Group
+            axis="y"
+            values={tenants}
+            onReorder={reorderTenants}
+            className="space-y-4"
+          >
+            <AnimatePresence initial={false}>
+              {tenants.map((tenant) => {
+                const billingState = getTenantBillingState(tenant.id);
+                return (
+                  <TenantItem
+                    key={tenant.id}
+                    tenant={tenant}
+                    electricityUnits={billingState.electricityUnits}
+                    extraCharges={billingState.extraCharges}
+                    onUpdateElectricity={(units) => {
+                      selectTenant(tenant.id);
+                      setElectricityUnits(units);
+                    }}
+                    onUpdateExtraCharges={(amount) => {
+                      selectTenant(tenant.id);
+                      setExtraCharges(amount);
+                    }}
+                    isSelected={selectedTenant?.id === tenant.id}
+                    onSelect={() => selectTenant(selectedTenant?.id === tenant.id ? null : tenant.id)}
+                    onEdit={() => setEditingTenant(tenant)}
+                    onDelete={() => handleDeleteTenant(tenant.id)}
+                  />
+                );
+              })}
+            </AnimatePresence>
+          </Reorder.Group>
+        )}
+      </div>
 
-            return (
-              <Card
-                key={tenant.id}
-                className={cn(
-                  'shadow-card transition-all duration-200',
-                  isSelected
-                    ? 'ring-2 ring-primary bg-primary/5'
-                    : 'hover:shadow-lg cursor-pointer'
-                )}
-                onClick={() => !isSelected && selectTenant(tenant.id)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        {isSelected && (
-                          <Check className="w-4 h-4 text-primary shrink-0" />
-                        )}
-                        <h3 className="font-semibold text-foreground truncate">{tenant.name}</h3>
-                      </div>
-                      {tenant.roomNumber && (
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <Home className="w-3 h-3" />
-                          {tenant.roomNumber}
-                        </p>
-                      )}
-
-                      {!isSelected && (
-                        <div className="flex gap-4 mt-2 text-sm">
-                          <span className="text-rent font-medium">₹{tenant.monthlyRent.toLocaleString()}/mo</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex gap-1 shrink-0">
-                      <Dialog open={editingTenant?.id === tenant.id} onOpenChange={(open) => !open && setEditingTenant(null)}>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingTenant(tenant);
-                            }}
-                          >
-                            <Pencil className="w-4 h-4 text-muted-foreground" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>
-                          <DialogHeader>
-                            <DialogTitle className="font-display text-xl">Edit Tenant</DialogTitle>
-                          </DialogHeader>
-                          <TenantForm
-                            initialData={tenant}
-                            onSubmit={handleEditTenant}
-                            onCancel={() => setEditingTenant(null)}
-                            submitLabel="Save Changes"
-                          />
-                        </DialogContent>
-                      </Dialog>
-
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 hover:bg-destructive/10"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Trash2 className="w-4 h-4 text-destructive" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Tenant?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently delete {tenant.name} and all their saved data.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-destructive hover:bg-destructive/90"
-                              onClick={() => handleDeleteTenant(tenant.id)}
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </div>
-
-                  {/* Expanded Billing Interface */}
-                  {isSelected && (
-                    <div className="mt-4 pt-4 border-t border-border animate-fade-in space-y-4">
-                      {/* Fixed Charges Display */}
-                      <div className="grid grid-cols-2 gap-3 p-3 bg-muted/50 rounded-lg">
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-1">Monthly Rent</p>
-                          <p className="font-semibold text-rent flex items-center">
-                            <IndianRupee className="w-3 h-3" />
-                            {tenant.monthlyRent.toLocaleString()}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-1">Water Bill</p>
-                          <p className="font-semibold text-water flex items-center">
-                            <IndianRupee className="w-3 h-3" />
-                            {tenant.waterBill.toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Inputs Grid */}
-                      <div className="grid grid-cols-1 gap-4">
-                        {/* Electricity Input */}
-                        <div className="space-y-1.5">
-                          <Label htmlFor={`elec-${tenant.id}`} className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
-                            <Zap className="w-3.5 h-3.5" />
-                            Electricity Units
-                          </Label>
-                          <div className="flex gap-3 items-center">
-                            <Input
-                              id={`elec-${tenant.id}`}
-                              type="number"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              min="0"
-                              placeholder="0"
-                              value={electricityUnits || ''}
-                              onChange={(e) => setElectricityUnits(Math.max(0, parseInt(e.target.value.replace(/\D/g, '')) || 0))}
-                              className="h-9"
-                            />
-                            {electricityUnits > 0 && (
-                              <div className="text-sm font-medium text-electricity whitespace-nowrap">
-                                + ₹{electricityCharges}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Extra Charges Input */}
-                        <div className="space-y-1.5">
-                          <Label htmlFor={`extra-${tenant.id}`} className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
-                            <Plus className="w-3.5 h-3.5" />
-                            Extra Charges
-                          </Label>
-                          <div className="flex gap-3 items-center">
-                            <Input
-                              id={`extra-${tenant.id}`}
-                              type="number"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              min="0"
-                              placeholder="0"
-                              value={extraCharges || ''}
-                              onChange={(e) => setExtraCharges(Math.max(0, parseInt(e.target.value.replace(/\D/g, '')) || 0))}
-                              className="h-9"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Date Picker */}
-                        <div className="space-y-1.5">
-                          <Label className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
-                            <Calendar className="w-3.5 h-3.5" />
-                            Billing Date
-                          </Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "w-full justify-start text-left font-normal h-9",
-                                  !billingDate && "text-muted-foreground"
-                                )}
-                              >
-                                {billingDate ? format(billingDate, "PPP") : <span>Pick a date</span>}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <CalendarComponent
-                                mode="single"
-                                selected={billingDate}
-                                onSelect={(date) => date && setBillingDate(date)}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
-
-                      {/* Total and Action */}
-                      <div className="pt-2 flex items-center justify-between border-t border-border mt-2">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Total Bill</p>
-                          <p className="text-xl font-bold text-primary flex items-center">
-                            <IndianRupee className="w-5 h-5" />
-                            {totalAmount.toLocaleString()}
-                          </p>
-                        </div>
-                        {onNavigateToSummary && (
-                          <Button onClick={onNavigateToSummary} className="bg-primary hover:bg-primary-dark gap-2">
-                            <FileText className="w-4 h-4" />
-                            Generate Bill
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+      {/* Edit Tenant Dialog */}
+      <Dialog open={!!editingTenant} onOpenChange={(open) => !open && setEditingTenant(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Tenant</DialogTitle>
+          </DialogHeader>
+          {editingTenant && (
+            <TenantForm
+              initialData={editingTenant}
+              onSubmit={handleEditTenant}
+              onCancel={() => setEditingTenant(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

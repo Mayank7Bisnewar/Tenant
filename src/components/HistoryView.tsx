@@ -1,12 +1,14 @@
 import React from 'react';
 import { PaymentRecord, Tenant } from '@/types/tenant';
 import { format, parseISO } from 'date-fns';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { History, Trash2 } from 'lucide-react';
+import { Card, CardContent } from "@/components/ui/card";
+import { History, Trash2, Calendar, Droplets, Zap, Home, Plus } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useBilling } from '@/context/BillingContext';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { motion, AnimatePresence } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 interface HistoryViewProps {
     tenant: Tenant;
@@ -23,39 +25,88 @@ export function HistoryView({ tenant }: HistoryViewProps) {
 
     if (sortedHistory.length === 0) {
         return (
-            <div className="text-center py-8 text-muted-foreground">
-                <History className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>No payment history found.</p>
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground animate-fade-in">
+                <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                    <History className="w-8 h-8 opacity-50" />
+                </div>
+                <p className="font-semibold text-lg text-foreground">No History Yet</p>
+                <p className="text-sm opacity-75">Records will appear here once you save a payment.</p>
             </div>
         );
     }
 
     return (
-        <Card className="border-none shadow-none">
-            <CardContent className="px-0">
-                <ScrollArea className="h-[400px]">
-                    <div className="space-y-3">
-                        {sortedHistory.map((record) => (
-                            <div
-                                key={record.id}
-                                className="border rounded-lg p-3 bg-card hover:bg-muted/50 transition-colors"
-                            >
-                                <div className="flex justify-between items-start mb-2">
-                                    <div>
-                                        <div className="font-semibold text-sm">
-                                            {format(parseISO(record.date), 'dd MMM yyyy')}
+        <Card className="border-none shadow-none bg-transparent">
+            <CardContent className="p-0">
+                <ScrollArea className="h-[450px] pr-4">
+                    <motion.div
+                        initial="hidden"
+                        animate="visible"
+                        variants={{
+                            visible: { transition: { staggerChildren: 0.05 } }
+                        }}
+                        className="space-y-3 pb-4"
+                    >
+                        <AnimatePresence mode='popLayout'>
+                            {sortedHistory.map((record) => (
+                                <motion.div
+                                    key={record.id}
+                                    layout
+                                    variants={{
+                                        hidden: { opacity: 0, y: 20 },
+                                        visible: { opacity: 1, y: 0 }
+                                    }}
+                                    exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+                                    className="group relative overflow-hidden transition-all hover:bg-muted/40 border border-border/50 bg-card/50 rounded-2xl p-4 shadow-sm"
+                                >
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className="flex gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                                                <Calendar className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-base flex items-center gap-2">
+                                                    {record.billingMonth}
+                                                </div>
+                                                <div className="text-xs text-muted-foreground font-medium">
+                                                    Paid on {format(parseISO(record.date), 'dd MMM yyyy, hh:mm a')}
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="text-xs text-muted-foreground">
-                                            {record.billingMonth}
+                                        <div className="text-right">
+                                            <div className="font-black text-lg text-primary">
+                                                ₹{record.amount.toLocaleString()}
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="text-right flex flex-col items-end gap-2">
-                                        <div className="font-bold text-primary text-lg">
-                                            ₹{record.amount.toLocaleString()}
+
+                                    <div className="grid grid-cols-2 gap-2 text-xs bg-muted/30 rounded-xl p-2.5">
+                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                            <Home className="w-3.5 h-3.5 text-primary/70" />
+                                            <span>Rent: <span className="font-bold text-foreground">₹{record.rentAmount}</span></span>
                                         </div>
+                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                            <Zap className="w-3.5 h-3.5 text-electricity" />
+                                            <span>Elec: <span className="font-bold text-foreground">₹{record.electricityAmount}</span> <span className="opacity-70">({record.electricityUnits}u)</span></span>
+                                        </div>
+                                        {record.waterAmount > 0 && (
+                                            <div className="flex items-center gap-2 text-muted-foreground">
+                                                <Droplets className="w-3.5 h-3.5 text-water" />
+                                                <span>Water: <span className="font-bold text-foreground">₹{record.waterAmount}</span></span>
+                                            </div>
+                                        )}
+                                        {record.extraAmount > 0 && (
+                                            <div className="flex items-center gap-2 text-muted-foreground">
+                                                <Plus className="w-3.5 h-3.5 text-amber-500" />
+                                                <span>Extra: <span className="font-bold text-foreground">₹{record.extraAmount}</span></span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <AlertDialog>
                                             <AlertDialogTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10">
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full">
                                                     <Trash2 className="w-4 h-4" />
                                                 </Button>
                                             </AlertDialogTrigger>
@@ -63,7 +114,7 @@ export function HistoryView({ tenant }: HistoryViewProps) {
                                                 <AlertDialogHeader>
                                                     <AlertDialogTitle>Delete Record?</AlertDialogTitle>
                                                     <AlertDialogDescription>
-                                                        Are you sure you want to delete this payment record for {record.billingMonth}? This action cannot be undone.
+                                                        Are you sure you want to delete this payment record for {record.billingMonth}? This cannot be undone.
                                                     </AlertDialogDescription>
                                                 </AlertDialogHeader>
                                                 <AlertDialogFooter>
@@ -78,32 +129,10 @@ export function HistoryView({ tenant }: HistoryViewProps) {
                                             </AlertDialogContent>
                                         </AlertDialog>
                                     </div>
-                                </div>
-
-                                <div className="grid grid-cols-3 gap-2 text-xs mt-2 pt-2 border-t">
-                                    <div>
-                                        <div className="text-muted-foreground">Rent</div>
-                                        <div className="font-medium">₹{record.rentAmount}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-muted-foreground">Electricity</div>
-                                        <div className="font-medium">{record.electricityUnits}u (₹{record.electricityAmount})</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-muted-foreground">Water</div>
-                                        <div className="font-medium">₹{record.waterAmount}</div>
-                                    </div>
-                                </div>
-
-                                {record.extraAmount > 0 && (
-                                    <div className="text-xs mt-2 pt-2 border-t">
-                                        <span className="text-muted-foreground">Extra: </span>
-                                        <span className="font-medium">₹{record.extraAmount}</span>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
+                    </motion.div>
                 </ScrollArea>
             </CardContent>
         </Card>

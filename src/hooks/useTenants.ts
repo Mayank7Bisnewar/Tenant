@@ -19,13 +19,15 @@ export function useTenants() {
     return newTenant;
   }, [setTenants]);
 
-  const updateTenant = useCallback((id: string, updates: Partial<Omit<Tenant, 'id' | 'createdAt'>>) => {
+  const updateTenant = useCallback((id: string, updates: Partial<Omit<Tenant, 'id' | 'createdAt'>> | ((tenant: Tenant) => Partial<Omit<Tenant, 'id' | 'createdAt'>>)) => {
     setTenants((prev) =>
-      prev.map((tenant) =>
-        tenant.id === id
-          ? { ...tenant, ...updates, updatedAt: new Date().toISOString() }
-          : tenant
-      )
+      prev.map((tenant) => {
+        if (tenant.id === id) {
+          const finalUpdates = typeof updates === 'function' ? updates(tenant) : updates;
+          return { ...tenant, ...finalUpdates, updatedAt: new Date().toISOString() };
+        }
+        return tenant;
+      })
     );
   }, [setTenants]);
 
@@ -43,5 +45,6 @@ export function useTenants() {
     updateTenant,
     deleteTenant,
     getTenant,
+    reorderTenants: setTenants,
   };
 }

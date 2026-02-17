@@ -46,11 +46,15 @@ export function ElectricityTab() {
             </Label>
             <Input
               id="units"
-              type="number"
-              inputMode="numeric"
+              name="units"
+              type="text"
+              inputMode="tel"
               pattern="[0-9]*"
-              min="0"
-              placeholder="Enter electricity units"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck="false"
+              placeholder="Enter units (NUMBERS)"
               value={electricityUnits || ''}
               onChange={(e) => handleUnitsChange(e.target.value.replace(/\D/g, ''))}
               className="text-lg h-12 text-center font-medium"

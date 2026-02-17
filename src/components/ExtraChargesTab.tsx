@@ -46,9 +46,13 @@ export function ExtraChargesTab() {
               <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <Input
                 id="extraCharges"
-                type="number"
-                inputMode="numeric"
+                type="text"
+                inputMode="tel"
                 pattern="[0-9]*"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck="false"
                 min="0"
                 placeholder="0"
                 value={extraCharges || ''}

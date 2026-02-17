@@ -11,6 +11,7 @@ interface BillingContextType {
   addTenant: (tenant: Omit<Tenant, 'id' | 'createdAt' | 'updatedAt'>) => Tenant;
   updateTenant: (id: string, updates: Partial<Omit<Tenant, 'id' | 'createdAt'>>) => void;
   deleteTenant: (id: string) => void;
+  reorderTenants: (tenants: Tenant[]) => void;
   addPaymentRecord: (tenantId: string, record: Omit<PaymentRecord, 'id'>) => PaymentRecord | void;
   updatePaymentRecord: (tenantId: string, recordId: string, updates: Partial<PaymentRecord>) => void;
   deletePaymentRecord: (tenantId: string, recordId: string) => void;
@@ -36,13 +37,14 @@ interface BillingContextType {
   // Bill generation
   generateBillData: () => BillData | null;
   generateBillDataForTenant: (tenantId: string) => BillData | null;
+  getTenantBillingState: (tenantId: string) => { electricityUnits: number; extraCharges: number; billingDate: Date };
   resetBill: () => void;
 }
 
 const BillingContext = createContext<BillingContextType | undefined>(undefined);
 
 export function BillingProvider({ children }: { children: React.ReactNode }) {
-  const { tenants, addTenant, updateTenant, deleteTenant, getTenant } = useTenants();
+  const { tenants, addTenant, updateTenant, deleteTenant, getTenant, reorderTenants } = useTenants();
   const { ownerInfo, setOwnerInfo } = useOwnerInfo();
 
   // App state
@@ -144,28 +146,26 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
   }, [getTenant, billingState]);
 
   const addPaymentRecord = useCallback((tenantId: string, record: Omit<PaymentRecord, 'id'>) => {
-    const tenant = getTenant(tenantId);
-    if (!tenant) return;
-
+    const recordId = crypto.randomUUID();
     const newRecord: PaymentRecord = {
       ...record,
-      id: crypto.randomUUID(),
+      id: recordId,
     };
 
-    const updatedHistory = [...(tenant.paymentHistory || []), newRecord];
-    updateTenant(tenantId, { paymentHistory: updatedHistory });
+    updateTenant(tenantId, (tenant) => ({
+      paymentHistory: [...(tenant.paymentHistory || []), newRecord]
+    }));
+
     return newRecord;
-  }, [getTenant, updateTenant]);
+  }, [updateTenant]);
 
   const updatePaymentRecord = useCallback((tenantId: string, recordId: string, updates: Partial<PaymentRecord>) => {
-    const tenant = getTenant(tenantId);
-    if (!tenant) return;
-
-    const updatedHistory = (tenant.paymentHistory || []).map(record =>
-      record.id === recordId ? { ...record, ...updates } : record
-    );
-    updateTenant(tenantId, { paymentHistory: updatedHistory });
-  }, [getTenant, updateTenant]);
+    updateTenant(tenantId, (tenant) => ({
+      paymentHistory: (tenant.paymentHistory || []).map(record =>
+        record.id === recordId ? { ...record, ...updates } : record
+      )
+    }));
+  }, [updateTenant]);
 
   const deletePaymentRecord = useCallback((tenantId: string, recordId: string) => {
     const tenant = getTenant(tenantId);
@@ -181,6 +181,10 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
     }
   }, [selectedTenantId, updateBillingState]);
 
+  const getTenantBillingState = useCallback((tenantId: string) => {
+    return billingState[tenantId] || { electricityUnits: 0, extraCharges: 0, billingDate: new Date() };
+  }, [billingState]);
+
   return (
     <BillingContext.Provider
       value={{
@@ -188,6 +192,7 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         addTenant,
         updateTenant,
         deleteTenant,
+        reorderTenants,
         addPaymentRecord,
         updatePaymentRecord,
         deletePaymentRecord,
@@ -204,7 +209,8 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         ownerInfo,
         setOwnerInfo,
         generateBillData,
-        generateBillDataForTenant, // Expose new helper
+        generateBillDataForTenant,
+        getTenantBillingState,
         resetBill,
       }}
     >
