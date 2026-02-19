@@ -113,8 +113,8 @@ function AppContent() {
       <header className="flex-none bg-card border-b border-border shadow-sm safe-area-top z-40">
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center shadow-md">
-              <Home className="w-5 h-5 text-primary-foreground" />
+            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-md">
+              <img src="/home-icon.png" alt="Home" className="w-full h-full object-cover" />
             </div>
             <div>
               <h1 className="font-display text-xl font-bold text-foreground select-none">Bisnewar Residence</h1>

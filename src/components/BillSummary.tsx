@@ -468,14 +468,23 @@ export function BillSummary() {
 
       {/* History Dialog */}
       <Dialog open={!!historyTenantId} onOpenChange={(open) => !open && setHistoryTenantId(null)}>
-        <DialogContent className="sm:max-w-2xl h-[80vh] flex flex-col p-0 gap-0">
-          <DialogHeader className="p-6 pb-2">
-            <DialogTitle className="flex items-center gap-2">
-              <History className="w-5 h-5 text-muted-foreground" />
-              {historyTenantId && tenants.find(t => t.id === historyTenantId)?.name}
+        <DialogContent className="sm:max-w-2xl h-[85vh] flex flex-col p-0 gap-0 [&>button]:text-primary-foreground [&>button]:hover:opacity-100">
+          <DialogHeader className="flex-none bg-gradient-to-r from-slate-700 to-slate-800 text-white p-4 pb-3">
+            <DialogTitle className="flex items-center gap-2.5 text-white">
+              <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center">
+                <History className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-base font-bold leading-tight">
+                  {historyTenantId && tenants.find(t => t.id === historyTenantId)?.name}
+                </p>
+                <p className="text-[11px] font-medium opacity-75 mt-0.5">
+                  Room {historyTenantId && tenants.find(t => t.id === historyTenantId)?.roomNumber} • Payment History
+                </p>
+              </div>
             </DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto px-6 pb-6">
+          <div className="flex-1 overflow-y-auto px-4 py-4">
             {historyTenantId && (
               <HistoryView tenant={tenants.find(t => t.id === historyTenantId)!} />
             )}
