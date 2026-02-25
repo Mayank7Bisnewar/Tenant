@@ -1,0 +1,68 @@
+import {
+    doc,
+    setDoc,
+    getDoc,
+    collection,
+    onSnapshot,
+    query,
+    orderBy
+} from "firebase/firestore";
+import { db } from "./firebase";
+import { Tenant } from "@/types/tenant";
+
+const convertTimestamps = (data: any): any => {
+    if (!data || typeof data !== 'object') return data;
+
+    // Handle Firestore Timestamp
+    if (data.seconds !== undefined && data.nanoseconds !== undefined && typeof data.toDate === 'function') {
+        return data.toDate();
+    }
+
+    // Handle Arrays
+    if (Array.isArray(data)) {
+        return data.map(convertTimestamps);
+    }
+
+    // Handle Objects
+    const result: any = {};
+    for (const key in data) {
+        if (Object.prototype.hasOwnProperty.call(data, key)) {
+            result[key] = convertTimestamps(data[key]);
+        }
+    }
+    return result;
+};
+
+export const firestoreService = {
+    // Sync Tenants
+    async saveTenants(uid: string, tenants: Tenant[]) {
+        const userDocRef = doc(db, "users", uid);
+        await setDoc(userDocRef, { tenants }, { merge: true });
+    },
+
+    listenToTenants(uid: string, callback: (tenants: Tenant[]) => void) {
+        const userDocRef = doc(db, "users", uid);
+        return onSnapshot(userDocRef, (doc) => {
+            if (doc.exists()) {
+                const data = doc.data();
+                callback(convertTimestamps(data.tenants || []));
+            }
+        });
+    },
+
+    // Sync Billing State
+    async saveBillingState(uid: string, billingState: any) {
+        const userDocRef = doc(db, "users", uid);
+        await setDoc(userDocRef, { billingState }, { merge: true });
+    },
+
+    listenToBillingState(uid: string, callback: (state: any) => void) {
+        const userDocRef = doc(db, "users", uid);
+        return onSnapshot(userDocRef, (doc) => {
+            if (doc.exists()) {
+                const data = doc.data();
+                callback(convertTimestamps(data.billingState || {}));
+            }
+        });
+    }
+};

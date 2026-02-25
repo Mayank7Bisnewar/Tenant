@@ -1,16 +1,20 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { PaymentRecord, Tenant, BillData, AppState } from '@/types/tenant';
 import { useTenants } from '@/hooks/useTenants';
 import { useOwnerInfo } from '@/hooks/useOwnerInfo';
+import { useAuth } from './AuthContext';
+import { firestoreService } from '@/lib/firestoreService';
 
 const ELECTRICITY_RATE = 12; // ₹12 per unit
 
 interface BillingContextType {
   // Tenant management
   tenants: Tenant[];
+  allTenants: Tenant[];
   addTenant: (tenant: Omit<Tenant, 'id' | 'createdAt' | 'updatedAt'>) => Tenant;
   updateTenant: (id: string, updates: Partial<Omit<Tenant, 'id' | 'createdAt'>>) => void;
   deleteTenant: (id: string) => void;
+  permanentDeleteTenant: (id: string) => void;
   reorderTenants: (tenants: Tenant[]) => void;
   addPaymentRecord: (tenantId: string, record: Omit<PaymentRecord, 'id'>) => PaymentRecord | void;
   updatePaymentRecord: (tenantId: string, recordId: string, updates: Partial<PaymentRecord>) => void;
@@ -44,7 +48,8 @@ interface BillingContextType {
 const BillingContext = createContext<BillingContextType | undefined>(undefined);
 
 export function BillingProvider({ children }: { children: React.ReactNode }) {
-  const { tenants, addTenant, updateTenant, deleteTenant, getTenant, reorderTenants } = useTenants();
+  const { tenants: allTenants, addTenant, updateTenant, deleteTenant: deleteTenantBase, permanentDeleteTenant, getTenant, reorderTenants: reorderTenantsBase } = useTenants();
+  const tenants = allTenants.filter(t => t.status === 'active');
   const { ownerInfo, setOwnerInfo } = useOwnerInfo();
 
   // App state
@@ -52,6 +57,36 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
 
   // Per-tenant billing state
   const [billingState, setBillingState] = useState<Record<string, { electricityUnits: number; extraCharges: number; billingDate: Date }>>({});
+  const { user } = useAuth();
+  const isInitialSync = useRef(true);
+
+  // Sync from Firestore to Local
+  useEffect(() => {
+    if (!user) {
+      isInitialSync.current = true;
+      return;
+    }
+
+    const unsubscribe = firestoreService.listenToBillingState(user.uid, (remoteState) => {
+      setBillingState(currentLocal => {
+        if (isInitialSync.current && (!remoteState || Object.keys(remoteState).length === 0) && Object.keys(currentLocal).length > 0) {
+          firestoreService.saveBillingState(user.uid, currentLocal);
+          isInitialSync.current = false;
+          return currentLocal;
+        }
+
+        if (remoteState && Object.keys(remoteState).length > 0) {
+          isInitialSync.current = false;
+          return remoteState;
+        }
+
+        isInitialSync.current = false;
+        return currentLocal;
+      });
+    });
+
+    return () => unsubscribe();
+  }, [user]);
 
   const selectedTenant = selectedTenantId ? getTenant(selectedTenantId) || null : null;
 
@@ -63,14 +98,40 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
   const billingDate = new Date(currentBillingState.billingDate); // Ensure Date object
 
   const updateBillingState = useCallback((tenantId: string, updates: Partial<{ electricityUnits: number; extraCharges: number; billingDate: Date }>) => {
-    setBillingState(prev => ({
-      ...prev,
-      [tenantId]: {
-        ...(prev[tenantId] || { electricityUnits: 0, extraCharges: 0, billingDate: new Date() }),
-        ...updates
+    setBillingState(prev => {
+      const newState = {
+        ...prev,
+        [tenantId]: {
+          ...(prev[tenantId] || { electricityUnits: 0, extraCharges: 0, billingDate: new Date() }),
+          ...updates
+        }
+      };
+      if (user) {
+        firestoreService.saveBillingState(user.uid, newState);
       }
-    }));
-  }, []);
+      return newState;
+    });
+  }, [user]);
+
+  const deleteTenant = useCallback((id: string) => {
+    deleteTenantBase(id);
+    setBillingState(prev => {
+      const newState = { ...prev };
+      delete newState[id];
+      if (user) {
+        firestoreService.saveBillingState(user.uid, newState);
+      }
+      return newState;
+    });
+    if (selectedTenantId === id) {
+      setSelectedTenantId(null);
+    }
+  }, [deleteTenantBase, user, selectedTenantId]);
+
+  const reorderTenants = useCallback((newActiveTenants: Tenant[]) => {
+    const deletedTenants = allTenants.filter(t => t.status === 'deleted');
+    reorderTenantsBase([...newActiveTenants, ...deletedTenants]);
+  }, [allTenants, reorderTenantsBase]);
 
   const selectTenant = useCallback((id: string | null) => {
     setSelectedTenantId(id);
@@ -140,8 +201,8 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
       electricityCharges: elecCharges,
       waterBill: tenant.waterBill,
       extraCharges: state.extraCharges,
-      totalAmount: total,
-      billingDate: new Date(state.billingDate),
+      totalAmount: total || 0,
+      billingDate: state.billingDate instanceof Date ? state.billingDate : new Date(state.billingDate),
     };
   }, [getTenant, billingState]);
 
@@ -192,10 +253,12 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         addTenant,
         updateTenant,
         deleteTenant,
+        permanentDeleteTenant,
         reorderTenants,
         addPaymentRecord,
         updatePaymentRecord,
         deletePaymentRecord,
+        allTenants, // Add allTenants to the context if needed for the directory
         selectedTenant,
         selectTenant,
         electricityUnits,

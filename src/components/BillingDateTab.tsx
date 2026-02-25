@@ -41,7 +41,7 @@ export function BillingDateTab() {
           {/* Selected Date Display */}
           <div className="text-center p-4 bg-muted rounded-lg">
             <p className="text-sm text-muted-foreground mb-1">Selected Date</p>
-            <p className="text-2xl font-bold text-foreground">
+            <p className="text-2xl font-semibold text-foreground">
               {format(billingDate, 'dd MMMM yyyy')}
             </p>
             <p className="text-sm text-muted-foreground mt-1">
@@ -50,9 +50,9 @@ export function BillingDateTab() {
           </div>
 
           {/* Quick Actions */}
-          <Button 
-            variant="outline" 
-            className="w-full" 
+          <Button
+            variant="outline"
+            className="w-full"
             onClick={setToday}
           >
             Set to Today

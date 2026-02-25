@@ -1,9 +1,16 @@
 
 export const GoogleSheetsService = {
     // Key for storing the script URL in local storage
-    SCRIPT_URL_KEY: 'rent_manager_script_url',
+    OLD_SCRIPT_URL_KEY: 'rent_manager_script_url',
+    SCRIPT_URL_KEY: 'tenant_manager_script_url',
 
     getScriptUrl: () => {
+        // Migrate legacy data
+        const oldUrl = localStorage.getItem(GoogleSheetsService.OLD_SCRIPT_URL_KEY);
+        if (oldUrl && !localStorage.getItem(GoogleSheetsService.SCRIPT_URL_KEY)) {
+            localStorage.setItem(GoogleSheetsService.SCRIPT_URL_KEY, oldUrl);
+            localStorage.removeItem(GoogleSheetsService.OLD_SCRIPT_URL_KEY);
+        }
         return localStorage.getItem(GoogleSheetsService.SCRIPT_URL_KEY) || '';
     },
 

@@ -179,7 +179,8 @@ export function BillSummary() {
     }
     message += `\n*Please ensure the surroundings and toilets are kept clean. Let’s maintain hygiene together. Thank you.*`;
     const encodedMessage = encodeURIComponent(message);
-    const phoneNumber = billData.mobileNumber.replace(/\D/g, '');
+    const phoneNumber = (billData.mobileNumber || '').replace(/\D/g, '');
+    if (!phoneNumber) return ''; // Fallback
     return `whatsapp://send?phone=91${phoneNumber}&text=${encodedMessage}`;
   };
 
@@ -352,7 +353,7 @@ export function BillSummary() {
                   >
                     {tenant.name}
                   </Label>
-                  <div className="flex text-[10px] text-muted-foreground gap-3 uppercase font-bold tracking-tight">
+                  <div className="flex text-[10px] text-muted-foreground gap-3 uppercase font-semibold tracking-tight">
                     <span className="flex items-center gap-1">
                       <Home className="w-3 h-3" /> {tenant.roomNumber}
                     </span>
@@ -376,7 +377,7 @@ export function BillSummary() {
                   >
                     <History className="w-4 h-4 text-muted-foreground" />
                   </Button>
-                  <div className="font-bold text-primary whitespace-nowrap">
+                  <div className="font-semibold text-primary whitespace-nowrap">
                     ₹{billData.totalAmount.toLocaleString()}
                   </div>
                 </div>
@@ -388,11 +389,11 @@ export function BillSummary() {
         {/* Total & Send - Fixed Footer */}
         <div className="flex-none p-3 border-t bg-card">
           <div className="flex items-center justify-between mb-2 px-1">
-            <span className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Total Receivable</span>
-            <span className="text-lg font-bold text-foreground">₹{selectedTotal.toLocaleString()}</span>
+            <span className="text-[10px] uppercase font-semibold tracking-widest text-muted-foreground">Total Receivable</span>
+            <span className="text-lg font-semibold text-foreground">₹{selectedTotal.toLocaleString()}</span>
           </div>
           <Button
-            className="w-full h-10 text-sm font-bold shadow-md bg-[#25D366] hover:bg-[#128C7E] text-white rounded-xl transition-all active:scale-[0.98]"
+            className="w-full h-10 text-sm font-semibold shadow-md bg-[#25D366] hover:bg-[#128C7E] text-white rounded-xl transition-all active:scale-[0.98]"
             disabled={selectedTenantIds.size === 0}
             onClick={() => setIsSendingModalOpen(true)}
           >
@@ -427,8 +428,8 @@ export function BillSummary() {
               return (
                 <div key={id} className="flex items-center justify-between p-3 border rounded-xl bg-card shadow-sm border-border/50">
                   <div className="min-w-0 flex-1">
-                    <p className="font-bold text-sm truncate">{tenant.name}</p>
-                    <p className="text-xs text-primary font-bold">₹{data.totalAmount.toLocaleString()}</p>
+                    <p className="font-semibold text-sm truncate">{tenant.name}</p>
+                    <p className="text-xs text-primary font-semibold">₹{data.totalAmount.toLocaleString()}</p>
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -475,7 +476,7 @@ export function BillSummary() {
                 <History className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-base font-bold leading-tight">
+                <p className="text-base font-semibold leading-tight">
                   {historyTenantId && tenants.find(t => t.id === historyTenantId)?.name}
                 </p>
                 <p className="text-[11px] font-medium opacity-75 mt-0.5">

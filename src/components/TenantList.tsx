@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, User, Phone, Home, Droplets, IndianRupee, Pencil, Trash2, Check, X, Zap, Calendar, FileText, Contact, GripVertical, GripHorizontal, Edit2 } from 'lucide-react';
+import { Plus, User, Phone, Home, Droplets, IndianRupee, Pencil, Trash2, Check, X, Zap, Calendar, FileText, Contact, GripVertical, GripHorizontal, Edit2, History } from 'lucide-react';
 import { Contacts } from '@capacitor-community/contacts';
 import { useBilling } from '@/context/BillingContext';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { Tenant } from '@/types/tenant';
 import { motion, AnimatePresence, Reorder, useDragControls } from 'framer-motion';
 
 import { TenantForm, TenantFormData } from '@/components/TenantForm';
+import { HistoryView } from '@/components/HistoryView';
 
 // Sub-component for individual Tenant Item to handle drag controls properly
 function TenantItem({
@@ -27,13 +28,15 @@ function TenantItem({
   electricityUnits,
   extraCharges,
   onUpdateElectricity,
-  onUpdateExtraCharges
+  onUpdateExtraCharges,
+  onViewHistory
 }: {
   tenant: Tenant,
   isSelected: boolean,
   onSelect: () => void,
   onEdit: () => void,
   onDelete: () => void,
+  onViewHistory: () => void,
   electricityUnits: number,
   extraCharges: number,
   onUpdateElectricity: (units: number) => void,
@@ -59,14 +62,17 @@ function TenantItem({
       }}
       className="list-none"
     >
-      <Card
+      <motion.div
         className={cn(
           'shadow-sm border-none transition-all duration-200 rounded-2xl bg-card cursor-pointer relative overflow-hidden',
           isSelected
             ? 'ring-2 ring-primary bg-primary/[0.02]'
-            : 'hover:shadow-md active:scale-[0.99]'
+            : 'hover:shadow-md'
         )}
         onClick={onSelect}
+        whileTap={{ scale: 0.96 }}
+        transition={{ type: "spring", stiffness: 260, damping: 20 }}
+        layout
       >
         <CardContent className="p-5">
           <div className="flex items-start justify-between gap-2">
@@ -83,16 +89,16 @@ function TenantItem({
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 mb-1">
-                <div className={cn(
+                {/* <div className={cn(
                   "w-10 h-10 rounded-xl flex items-center justify-center transition-colors flex-none",
                   isSelected ? "bg-primary text-white" : "bg-primary/10 text-primary"
                 )}>
                   <User className="w-5 h-5" />
-                </div>
+                </div> */}
                 <div className="min-w-0">
-                  <h3 className="font-bold text-foreground text-base truncate leading-tight">{tenant.name}</h3>
+                  <h3 className="font-semibold text-foreground text-base truncate leading-tight">{tenant.name}</h3>
                   {tenant.roomNumber && (
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider flex items-center gap-1">
+                    <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider flex items-center gap-1">
                       Room {tenant.roomNumber}
                     </p>
                   )}
@@ -100,7 +106,7 @@ function TenantItem({
               </div>
 
               {!isSelected && (
-                <div className="flex items-center gap-4 text-sm font-bold pl-[52px]">
+                <div className="flex items-center gap-2 text-sm font-semibold pl-0">
                   <div className="flex items-center gap-1.5 text-primary">
                     <Home className="w-4 h-4" /> ₹{tenant.monthlyRent.toLocaleString()}
                   </div>
@@ -109,16 +115,17 @@ function TenantItem({
                       <Zap className="w-4 h-4" /> ₹{electricityCharges.toLocaleString()}
                     </div>
                   )}
-                  {/* {extraCharges > 0 && (
-                    <div className="flex items-center gap-1.5 text-amber-500">
-                      <Plus className="w-4 h-4" /> ₹{extraCharges.toLocaleString()}
-                    </div>
-                  )} */}
                   {tenant.waterBill > 0 && (
                     <div className="flex items-center gap-1.5 text-water">
                       <Droplets className="w-4 h-4" /> ₹{tenant.waterBill.toLocaleString()}
                     </div>
                   )}
+                  {extraCharges > 0 && (
+                    <div className="flex items-center gap-1.5 text-amber-500">
+                      <Plus className="w-4 h-4" /> ₹{extraCharges.toLocaleString()}
+                    </div>
+                  )}
+
                 </div>
               )}
             </div>
@@ -130,22 +137,54 @@ function TenantItem({
                 className="h-9 w-9 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full"
                 onClick={(e) => {
                   e.stopPropagation();
+                  onViewHistory();
+                }}
+              >
+                <History className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full"
+                onClick={(e) => {
+                  e.stopPropagation();
                   onEdit();
                 }}
               >
                 <Edit2 className="w-4 h-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete();
-                }}
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Tenant</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete {tenant.name}? This action cannot be undone and all billing history for this tenant will be lost.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete();
+                      }}
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </div>
 
@@ -161,34 +200,34 @@ function TenantItem({
                 <div className="pt-4 mt-4 border-t border-border/50">
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     <div className="bg-muted/30 p-3 rounded-xl">
-                      <p className="text-[10px] text-muted-foreground font-bold uppercase mb-1">Mobile</p>
-                      <p className="text-sm font-bold flex items-center gap-2">
+                      <p className="text-[10px] text-muted-foreground font-semibold uppercase mb-1">Mobile</p>
+                      <p className="text-sm font-semibold flex items-center gap-2">
                         <Phone className="w-3.5 h-3.5 text-primary" /> {tenant.mobileNumber}
                       </p>
                     </div>
                     <div className="bg-muted/30 p-3 rounded-xl">
-                      <p className="text-[10px] text-muted-foreground font-bold uppercase mb-1">Monthly Rent</p>
-                      <p className="text-sm font-bold">₹{tenant.monthlyRent.toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground font-semibold uppercase mb-1">Monthly Rent</p>
+                      <p className="text-sm font-semibold">₹{tenant.monthlyRent.toLocaleString()}</p>
                     </div>
                   </div>
 
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <label className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1.5 ml-1">
+                        <label className="text-[10px] font-semibold uppercase text-muted-foreground flex items-center gap-1.5 ml-1">
                           <Zap className="w-3 h-3 text-electricity" /> Electricity Units
                         </label>
                         <div className="relative">
                           <input
                             type="number"
                             placeholder="Units"
-                            className="w-full h-11 px-4 pr-12 rounded-xl bg-muted/30 border-none font-bold focus:ring-2 focus:ring-primary/20 transition-all font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            className="w-full h-11 px-4 pr-12 rounded-xl bg-muted/30 border-none font-semibold focus:ring-2 focus:ring-primary/20 transition-all font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             value={electricityUnits || ''}
                             onChange={(e) => onUpdateElectricity(parseFloat(e.target.value) || 0)}
                             onClick={(e) => e.stopPropagation()}
                           />
                           {electricityUnits > 0 && (
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-electricity bg-electricity/10 px-1.5 py-0.5 rounded">
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-electricity bg-electricity/10 px-1.5 py-0.5 rounded">
                               ₹{electricityCharges}
                             </div>
                           )}
@@ -196,20 +235,20 @@ function TenantItem({
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1.5 ml-1">
+                        <label className="text-[10px] font-semibold uppercase text-muted-foreground flex items-center gap-1.5 ml-1">
                           <Plus className="w-3 h-3 text-amber-500" /> Extra Charges
                         </label>
                         <div className="relative">
                           <input
                             type="number"
                             placeholder="Amount"
-                            className="w-full h-11 px-4 pr-12 rounded-xl bg-muted/30 border-none font-bold focus:ring-2 focus:ring-primary/20 transition-all font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            className="w-full h-11 px-4 pr-12 rounded-xl bg-muted/30 border-none font-semibold focus:ring-2 focus:ring-primary/20 transition-all font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             value={extraCharges || ''}
                             onChange={(e) => onUpdateExtraCharges(parseFloat(e.target.value) || 0)}
                             onClick={(e) => e.stopPropagation()}
                           />
                           {extraCharges > 0 && (
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded">
                               ₹{extraCharges}
                             </div>
                           )}
@@ -218,7 +257,7 @@ function TenantItem({
                     </div>
 
                     <Button
-                      className="w-full h-12 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-md transition-all active:scale-[0.98]"
+                      className="w-full h-12 bg-primary hover:bg-primary-dark text-white font-semibold rounded-xl shadow-md transition-all active:scale-[0.98]"
                       onClick={(e) => {
                         e.stopPropagation();
                         onSelect();
@@ -232,7 +271,7 @@ function TenantItem({
             )}
           </AnimatePresence>
         </CardContent>
-      </Card>
+      </motion.div>
     </Reorder.Item>
   );
 }
@@ -252,6 +291,7 @@ export function TenantList({ onNavigateToSummary }: { onNavigateToSummary?: () =
   } = useBilling();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
+  const [historyTenantId, setHistoryTenantId] = useState<string | null>(null);
 
   const handleAddTenant = (data: TenantFormData) => {
     const newTenant = addTenant({
@@ -261,6 +301,7 @@ export function TenantList({ onNavigateToSummary }: { onNavigateToSummary?: () =
       monthlyRent: parseFloat(data.monthlyRent) || 0,
       waterBill: parseFloat(data.waterBill) || 0,
       paymentHistory: [],
+      status: 'active',
     });
     selectTenant(newTenant.id);
     setIsAddOpen(false);
@@ -291,7 +332,7 @@ export function TenantList({ onNavigateToSummary }: { onNavigateToSummary?: () =
       {/* Add Tenant Button - Fixed */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogTrigger asChild>
-          <Button className="flex-none w-full gap-2 bg-primary hover:bg-primary-dark h-11 text-base font-bold shadow-md rounded-xl transition-all active:scale-[0.98]">
+          <Button className="flex-none w-full gap-2 bg-primary hover:bg-primary-dark h-11 text-base font-semibold shadow-md rounded-xl transition-all active:scale-[0.98]">
             <Plus className="w-5 h-5" />
             Add New Tenant
           </Button>
@@ -345,6 +386,7 @@ export function TenantList({ onNavigateToSummary }: { onNavigateToSummary?: () =
                     onSelect={() => selectTenant(selectedTenant?.id === tenant.id ? null : tenant.id)}
                     onEdit={() => setEditingTenant(tenant)}
                     onDelete={() => handleDeleteTenant(tenant.id)}
+                    onViewHistory={() => setHistoryTenantId(tenant.id)}
                   />
                 );
               })}
@@ -366,6 +408,31 @@ export function TenantList({ onNavigateToSummary }: { onNavigateToSummary?: () =
               onCancel={() => setEditingTenant(null)}
             />
           )}
+        </DialogContent>
+      </Dialog>
+      {/* History Dialog */}
+      <Dialog open={!!historyTenantId} onOpenChange={(open) => !open && setHistoryTenantId(null)}>
+        <DialogContent className="sm:max-w-2xl h-[85vh] flex flex-col p-0 gap-0 [&>button]:text-primary-foreground [&>button]:hover:opacity-100">
+          <DialogHeader className="flex-none bg-gradient-to-r from-slate-700 to-slate-800 text-white p-4 pb-3">
+            <DialogTitle className="flex items-center gap-2.5 text-white">
+              <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center">
+                <History className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-base font-semibold leading-tight">
+                  {historyTenantId && tenants.find(t => t.id === historyTenantId)?.name}
+                </p>
+                <p className="text-[11px] font-medium opacity-75 mt-0.5">
+                  Room {historyTenantId && tenants.find(t => t.id === historyTenantId)?.roomNumber} • Payment History
+                </p>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            {historyTenantId && tenants.find(t => t.id === historyTenantId) && (
+              <HistoryView tenant={tenants.find(t => t.id === historyTenantId)!} />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

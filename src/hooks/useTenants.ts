@@ -1,11 +1,71 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useLocalStorage } from './useLocalStorage';
 import { Tenant } from '@/types/tenant';
+import { useAuth } from '@/context/AuthContext';
+import { firestoreService } from '@/lib/firestoreService';
 
-const STORAGE_KEY = 'rentmate_tenants';
+const OLD_STORAGE_KEY = 'rentmate_tenants';
+const STORAGE_KEY = 'tenant_manager_tenants';
+
+// Migrate legacy data
+if (localStorage.getItem(OLD_STORAGE_KEY) && !localStorage.getItem(STORAGE_KEY)) {
+  localStorage.setItem(STORAGE_KEY, localStorage.getItem(OLD_STORAGE_KEY)!);
+  localStorage.removeItem(OLD_STORAGE_KEY);
+}
 
 export function useTenants() {
-  const [tenants, setTenants] = useLocalStorage<Tenant[]>(STORAGE_KEY, []);
+  const [localTenants, setLocalTenants] = useLocalStorage<Tenant[]>(STORAGE_KEY, []);
+  const { user } = useAuth();
+  const isInitialSync = useRef(true);
+
+  // Sync from Firestore to Local
+  useEffect(() => {
+    if (!user) {
+      isInitialSync.current = true;
+      return;
+    }
+
+    const unsubscribe = firestoreService.listenToTenants(user.uid, (remoteTenants) => {
+      setLocalTenants((currentLocal) => {
+        // Migration Logic: If remote is empty but local has records, upload local
+        if (isInitialSync.current && (!remoteTenants || remoteTenants.length === 0) && currentLocal.length > 0) {
+          firestoreService.saveTenants(user.uid, currentLocal);
+          isInitialSync.current = false;
+          return currentLocal;
+        }
+
+        // Merge/Sync Logic: Remote takes precedence once initialized
+        if (remoteTenants && remoteTenants.length > 0) {
+          isInitialSync.current = false;
+          // Ensure all tenants have a status (for legacy migration)
+          return remoteTenants.map(t => ({
+            ...t,
+            status: t.status || 'active'
+          }));
+        }
+
+        isInitialSync.current = false;
+        // Also ensure local status
+        return currentLocal.map(t => ({
+          ...t,
+          status: t.status || 'active'
+        }));
+      });
+    });
+
+    return () => unsubscribe();
+  }, [user, setLocalTenants]);
+
+  // Helper to update both local and remote
+  const updateState = useCallback((newTenants: Tenant[] | ((prev: Tenant[]) => Tenant[])) => {
+    setLocalTenants((prev) => {
+      const finalTenants = typeof newTenants === 'function' ? newTenants(prev) : newTenants;
+      if (user) {
+        firestoreService.saveTenants(user.uid, finalTenants);
+      }
+      return finalTenants;
+    });
+  }, [user, setLocalTenants]);
 
   const addTenant = useCallback((tenant: Omit<Tenant, 'id' | 'createdAt' | 'updatedAt'>) => {
     const now = new Date().toISOString();
@@ -14,13 +74,14 @@ export function useTenants() {
       id: crypto.randomUUID(),
       createdAt: now,
       updatedAt: now,
+      status: 'active',
     };
-    setTenants((prev) => [...prev, newTenant]);
+    updateState((prev) => [...prev, newTenant]);
     return newTenant;
-  }, [setTenants]);
+  }, [updateState]);
 
   const updateTenant = useCallback((id: string, updates: Partial<Omit<Tenant, 'id' | 'createdAt'>> | ((tenant: Tenant) => Partial<Omit<Tenant, 'id' | 'createdAt'>>)) => {
-    setTenants((prev) =>
+    updateState((prev) =>
       prev.map((tenant) => {
         if (tenant.id === id) {
           const finalUpdates = typeof updates === 'function' ? updates(tenant) : updates;
@@ -29,22 +90,39 @@ export function useTenants() {
         return tenant;
       })
     );
-  }, [setTenants]);
+  }, [updateState]);
 
   const deleteTenant = useCallback((id: string) => {
-    setTenants((prev) => prev.filter((tenant) => tenant.id !== id));
-  }, [setTenants]);
+    updateState((prev) =>
+      prev.map((tenant) => {
+        if (tenant.id === id) {
+          return {
+            ...tenant,
+            status: 'deleted',
+            deletedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return tenant;
+      })
+    );
+  }, [updateState]);
+
+  const permanentDeleteTenant = useCallback((id: string) => {
+    updateState((prev) => prev.filter((tenant) => tenant.id !== id));
+  }, [updateState]);
 
   const getTenant = useCallback((id: string) => {
-    return tenants.find((tenant) => tenant.id === id);
-  }, [tenants]);
+    return localTenants.find((tenant) => tenant.id === id);
+  }, [localTenants]);
 
   return {
-    tenants,
+    tenants: localTenants,
     addTenant,
     updateTenant,
     deleteTenant,
+    permanentDeleteTenant,
     getTenant,
-    reorderTenants: setTenants,
+    reorderTenants: updateState,
   };
 }

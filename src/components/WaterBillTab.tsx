@@ -32,7 +32,7 @@ export function WaterBillTab() {
         <CardContent className="pt-6">
           <div className="text-center">
             <p className="text-sm text-muted-foreground mb-2">Monthly Water Bill for {selectedTenant.name}</p>
-            <div className="flex items-center justify-center gap-1 text-4xl font-bold text-water">
+            <div className="flex items-center justify-center gap-1 text-4xl font-semibold text-water">
               <IndianRupee className="w-8 h-8" />
               <span>{selectedTenant.waterBill.toLocaleString()}</span>
             </div>

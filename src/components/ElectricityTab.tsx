@@ -78,7 +78,7 @@ export function ElectricityTab() {
                   {electricityUnits} units × ₹{ELECTRICITY_RATE} =
                 </p>
               </div>
-              <div className="flex items-center justify-center gap-1 text-3xl font-bold text-electricity">
+              <div className="flex items-center justify-center gap-1 text-3xl font-semibold text-electricity">
                 <IndianRupee className="w-7 h-7" />
                 <span>{electricityCharges.toLocaleString()}</span>
               </div>

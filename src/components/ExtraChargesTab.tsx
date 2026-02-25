@@ -70,7 +70,7 @@ export function ExtraChargesTab() {
             <div className="p-4 bg-extra/10 rounded-lg border border-extra/20 animate-fade-in">
               <div className="text-center">
                 <p className="text-sm text-muted-foreground mb-2">Extra Charges Added</p>
-                <div className="flex items-center justify-center gap-1 text-3xl font-bold text-extra">
+                <div className="flex items-center justify-center gap-1 text-3xl font-semibold text-extra">
                   <IndianRupee className="w-7 h-7" />
                   <span>{extraCharges.toLocaleString()}</span>
                 </div>

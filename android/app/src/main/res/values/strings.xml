@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">Tenant</string>
     <string name="title_activity_main">Tenant</string>
-    <string name="package_name">com.rentmanager.pro</string>
-    <string name="custom_url_scheme">com.rentmanager.pro</string>
+    <string name="package_name">com.tenant</string>
+    <string name="custom_url_scheme">com.tenant</string>
+    <string name="server_client_id">196000772262-ghkitgufdvhr84qkm07ad5iillng7tt9.apps.googleusercontent.com</string>
 </resources>

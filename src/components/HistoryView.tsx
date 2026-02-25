@@ -27,7 +27,7 @@ export function HistoryView({ tenant }: HistoryViewProps) {
                 <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-5">
                     <Receipt className="w-10 h-10 opacity-40" />
                 </div>
-                <p className="font-bold text-lg text-foreground mb-1">No Payments Yet</p>
+                <p className="font-semibold text-lg text-foreground mb-1">No Payments Yet</p>
                 <p className="text-sm opacity-60 text-center max-w-[220px]">Payment records will show up here after you save a bill.</p>
             </div>
         );
@@ -69,7 +69,7 @@ export function HistoryView({ tenant }: HistoryViewProps) {
                                         <Calendar className="w-4 h-4" />
                                     </div>
                                     <div>
-                                        <p className="font-bold text-[15px] leading-tight">{record.billingMonth}</p>
+                                        <p className="font-semibold text-[15px] leading-tight">{record.billingMonth}</p>
                                         <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
                                             <Clock className="w-3 h-3" />
                                             {format(parseISO(record.date), 'dd MMM yyyy, hh:mm a')}
@@ -85,7 +85,7 @@ export function HistoryView({ tenant }: HistoryViewProps) {
                                     </span>
                                     <AlertDialog>
                                         <AlertDialogTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 rounded-full shrink-0">
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full ">
                                                 <Trash2 className="w-3.5 h-3.5" />
                                             </Button>
                                         </AlertDialogTrigger>
@@ -114,21 +114,21 @@ export function HistoryView({ tenant }: HistoryViewProps) {
                             <div className="mx-3.5 mb-3 grid grid-cols-2 gap-x-3 gap-y-1.5 bg-muted/30 rounded-xl px-3 py-2.5 text-xs">
                                 <div className="flex items-center gap-2 text-muted-foreground">
                                     <Home className="w-3.5 h-3.5 text-primary/70 shrink-0" />
-                                    <span>Rent: <span className="font-bold text-foreground">₹{record.rentAmount}</span></span>
+                                    <span>Rent: <span className="font-semibold text-foreground">₹{record.rentAmount}</span></span>
                                 </div>
                                 <div className="flex items-center gap-2 text-muted-foreground">
                                     <Zap className="w-3.5 h-3.5 text-electricity shrink-0" />
-                                    <span>Elec: <span className="font-bold text-foreground">₹{record.electricityAmount}</span> <span className="opacity-70">({record.electricityUnits}u)</span></span>
+                                    <span>Elec: <span className="font-semibold text-foreground">₹{record.electricityAmount}</span> <span className="opacity-70">({record.electricityUnits}u)</span></span>
                                 </div>
                                 {record.waterAmount > 0 && (
                                     <div className="flex items-center gap-2 text-muted-foreground">
                                         <Droplets className="w-3.5 h-3.5 text-water shrink-0" />
-                                        <span>Water: <span className="font-bold text-foreground">₹{record.waterAmount}</span></span>
+                                        <span>Water: <span className="font-semibold text-foreground">₹{record.waterAmount}</span></span>
                                     </div>
                                 )}
                                 <div className="flex items-center gap-2 text-muted-foreground">
                                     <Plus className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                                    <span>Extra: <span className="font-bold text-foreground">₹{record.extraAmount}</span></span>
+                                    <span>Extra: <span className="font-semibold text-foreground">₹{record.extraAmount}</span></span>
                                 </div>
                             </div>
                         </motion.div>

@@ -1,9 +1,19 @@
 {
-  "appId": "com.rentmanager.pro",
-  "appName": "Bisnewar Residence",
+  "appId": "com.tenant",
+  "appName": "Tenant",
   "webDir": "dist",
   "android": {
     "allowMixedContent": true,
     "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "GoogleAuth": {
+      "scopes": [
+        "profile",
+        "email"
+      ],
+      "serverClientId": "196000772262-ghkitgufdvhr84qkm07ad5iillng7tt9.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": true
+    }
   }
 }

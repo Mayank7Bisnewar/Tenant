@@ -21,6 +21,8 @@ export interface Tenant {
   paymentHistory: PaymentRecord[];
   createdAt: string;
   updatedAt: string;
+  status: 'active' | 'deleted';
+  deletedAt?: string;
 }
 
 export interface BillData {

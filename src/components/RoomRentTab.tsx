@@ -35,7 +35,7 @@ export function RoomRentTab() {
             {selectedTenant.roomNumber && (
               <p className="text-sm text-muted-foreground mb-4">{selectedTenant.roomNumber}</p>
             )}
-            <div className="flex items-center justify-center gap-1 text-4xl font-bold text-foreground">
+            <div className="flex items-center justify-center gap-1 text-4xl font-semibold text-foreground">
               <IndianRupee className="w-8 h-8" />
               <span>{selectedTenant.monthlyRent.toLocaleString()}</span>
             </div>

@@ -8,6 +8,7 @@ import { BillSummary } from '@/components/BillSummary';
 import { TenantDirectory } from '@/components/TenantDirectory';
 import { Home } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { AuthButton } from '@/components/AuthButton';
 import { useToast } from '@/hooks/use-toast';
 
 function AppContent() {
@@ -117,13 +118,16 @@ function AppContent() {
               <img src="/home-icon.png" alt="Home" className="w-full h-full object-cover" />
             </div>
             <div>
-              <h1 className="font-display text-xl font-bold text-foreground select-none">TENANT</h1>
+              <h1 className="font-logo text-lg font-bold text-foreground select-none tracking-[0.01em] leading-none transform scale-y-[0.85] origin-left">TENANT</h1>
               <p className="text-xs text-muted-foreground">
                 {getTabTitle()}
               </p>
             </div>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <AuthButton />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 

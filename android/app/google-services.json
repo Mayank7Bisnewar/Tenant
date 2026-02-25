@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "196000772262",
+    "project_id": "tenant-backup2026",
+    "storage_bucket": "tenant-backup2026.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:196000772262:android:717f9bb911cd2bcb4d8467",
+        "android_client_info": {
+          "package_name": "com.tenant"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "196000772262-6djfd8dgbknuvfkv2rr26prcj9irc6aq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.tenant",
+            "certificate_hash": "e32b3765f6216ccfefa434cf7fe19085d9aeef45"
+          }
+        },
+        {
+          "client_id": "196000772262-ghkitgufdvhr84qkm07ad5iillng7tt9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBItQvYI9xEXzCZLiMVEb3ULhLUIpIw3Ts"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "196000772262-ghkitgufdvhr84qkm07ad5iillng7tt9.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
