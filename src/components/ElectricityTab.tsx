@@ -5,10 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-const ELECTRICITY_RATE = 12; // ₹12 per unit
-
 export function ElectricityTab() {
-  const { selectedTenant, electricityUnits, setElectricityUnits, electricityCharges } = useBilling();
+  const { selectedTenant, electricityUnits, setElectricityUnits, electricityCharges, electricityRate } = useBilling();
 
   if (!selectedTenant) {
     return (
@@ -65,7 +63,7 @@ export function ElectricityTab() {
           <div className="p-4 bg-muted rounded-lg">
             <div className="flex justify-between items-center text-sm">
               <span className="text-muted-foreground">Rate per unit</span>
-              <span className="font-semibold">₹{ELECTRICITY_RATE}</span>
+              <span className="font-semibold">₹{electricityRate}</span>
             </div>
           </div>
 
@@ -75,7 +73,7 @@ export function ElectricityTab() {
               <div className="text-center mb-3">
                 <p className="text-sm text-muted-foreground">Calculation</p>
                 <p className="font-mono text-lg">
-                  {electricityUnits} units × ₹{ELECTRICITY_RATE} =
+                  {electricityUnits} units × ₹{electricityRate} =
                 </p>
               </div>
               <div className="flex items-center justify-center gap-1 text-3xl font-semibold text-electricity">

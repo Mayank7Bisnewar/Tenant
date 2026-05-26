@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, User, Phone, Home, Droplets, IndianRupee, Pencil, Trash2, Check, X, Zap, Calendar, FileText, Contact, GripVertical, GripHorizontal, Edit2, History } from 'lucide-react';
+import { Plus, User, Phone, Home, Droplets, IndianRupee, Pencil, Trash2, Check, X, Zap, Calendar, FileText, Contact, GripVertical, GripHorizontal, Edit2, History as HistoryIcon } from 'lucide-react';
 import { Contacts } from '@capacitor-community/contacts';
 import { useBilling } from '@/context/BillingContext';
 import { Button } from '@/components/ui/button';
@@ -43,7 +43,8 @@ function TenantItem({
   onUpdateExtraCharges: (amount: number) => void
 }) {
   const controls = useDragControls();
-  const electricityCharges = electricityUnits * 12;
+  const { electricityRate } = useBilling();
+  const electricityCharges = electricityUnits * electricityRate;
   const totalAmount = tenant.monthlyRent + electricityCharges + tenant.waterBill + extraCharges;
 
   return (
@@ -75,11 +76,11 @@ function TenantItem({
         layout
       >
         <CardContent className="p-5">
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start justify-between gap-0.3">
             {/* Drag Handle - Left Side */}
             {/* Drag Handle - Left Side */}
             <div
-              className="flex-none self-center p-2 -ml-2 text-primary/40 hover:text-primary transition-colors cursor-grab active:cursor-grabbing z-10 touch-none"
+              className="flex-none self-center p-1 -ml-5 text-primary/40 hover:text-primary transition-colors cursor-grab active:cursor-grabbing z-10 touch-none"
               onPointerDown={(e) => {
                 controls.start(e);
               }}
@@ -140,7 +141,7 @@ function TenantItem({
                   onViewHistory();
                 }}
               >
-                <History className="w-4 h-4" />
+                <HistoryIcon className="w-4 h-4" />
               </Button>
               <Button
                 variant="ghost"
@@ -200,14 +201,16 @@ function TenantItem({
                 <div className="pt-4 mt-4 border-t border-border/50">
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     <div className="bg-muted/30 p-3 rounded-xl">
-                      <p className="text-[10px] text-muted-foreground font-semibold uppercase mb-1">Mobile</p>
+                      <p className="text-[10px] text-muted-foreground font-semibold uppercase mb-1">Monthly Rent</p>
                       <p className="text-sm font-semibold flex items-center gap-2">
-                        <Phone className="w-3.5 h-3.5 text-primary" /> {tenant.mobileNumber}
+                        <IndianRupee className="w-3.5 h-3.5 text-amber-500" /> ₹{tenant.monthlyRent.toLocaleString()}
                       </p>
                     </div>
                     <div className="bg-muted/30 p-3 rounded-xl">
-                      <p className="text-[10px] text-muted-foreground font-semibold uppercase mb-1">Monthly Rent</p>
-                      <p className="text-sm font-semibold">₹{tenant.monthlyRent.toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground font-semibold uppercase mb-1">Water Bill</p>
+                      <p className="text-sm font-semibold flex items-center gap-2">
+                        <Droplets className="w-3.5 h-3.5 text-sky-500" /> ₹{tenant.waterBill.toLocaleString()}
+                      </p>
                     </div>
                   </div>
 
@@ -289,23 +292,8 @@ export function TenantList({ onNavigateToSummary }: { onNavigateToSummary?: () =
     setElectricityUnits,
     setExtraCharges
   } = useBilling();
-  const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
   const [historyTenantId, setHistoryTenantId] = useState<string | null>(null);
-
-  const handleAddTenant = (data: TenantFormData) => {
-    const newTenant = addTenant({
-      name: data.name.trim(),
-      roomNumber: data.roomNumber.trim(),
-      mobileNumber: data.mobileNumber.trim(),
-      monthlyRent: parseFloat(data.monthlyRent) || 0,
-      waterBill: parseFloat(data.waterBill) || 0,
-      paymentHistory: [],
-      status: 'active',
-    });
-    selectTenant(newTenant.id);
-    setIsAddOpen(false);
-  };
 
   const handleEditTenant = (data: TenantFormData) => {
     if (editingTenant) {
@@ -328,28 +316,10 @@ export function TenantList({ onNavigateToSummary }: { onNavigateToSummary?: () =
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 py-4 gap-6 overflow-hidden">
-      {/* Add Tenant Button - Fixed */}
-      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogTrigger asChild>
-          <Button className="flex-none w-full gap-2 bg-primary hover:bg-primary-dark h-11 text-base font-semibold shadow-md rounded-xl transition-all active:scale-[0.98]">
-            <Plus className="w-5 h-5" />
-            Add New Tenant
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-display text-xl">Add New Tenant</DialogTitle>
-          </DialogHeader>
-          <TenantForm
-            onSubmit={handleAddTenant}
-            onCancel={() => setIsAddOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
+    <div className="flex-1 flex flex-col min-h-0 py-0 gap-6 overflow-hidden">
 
       {/* Tenant List - Scrollable Area */}
-      <div className="flex-1 overflow-y-auto pt-2 pb-6 px-0.5">
+      <div className="flex-1 overflow-y-auto pt-1 px-0.5" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 80px)' }}>
         {tenants.length === 0 ? (
           <Card className="shadow-card border-dashed border-2">
             <CardContent className="py-12 text-center">
@@ -397,42 +367,79 @@ export function TenantList({ onNavigateToSummary }: { onNavigateToSummary?: () =
 
       {/* Edit Tenant Dialog */}
       <Dialog open={!!editingTenant} onOpenChange={(open) => !open && setEditingTenant(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Tenant</DialogTitle>
-          </DialogHeader>
-          {editingTenant && (
-            <TenantForm
-              initialData={editingTenant}
-              onSubmit={handleEditTenant}
-              onCancel={() => setEditingTenant(null)}
-            />
-          )}
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+          <motion.div
+            className="p-6 bg-card touch-pan-y"
+            drag="x"
+            dragDirectionLock
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.9}
+            onDragEnd={(e, info) => {
+              const { offset, velocity } = info;
+              if (
+                (Math.abs(offset.x) > 30 || Math.abs(velocity.x) > 0.4) &&
+                Math.abs(offset.x) > Math.abs(offset.y)
+              ) {
+                setEditingTenant(null);
+              }
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>Edit Tenant</DialogTitle>
+            </DialogHeader>
+            <div className="pt-4">
+              {editingTenant && (
+                <TenantForm
+                  initialData={editingTenant}
+                  onSubmit={handleEditTenant}
+                  onCancel={() => setEditingTenant(null)}
+                />
+              )}
+            </div>
+          </motion.div>
         </DialogContent>
       </Dialog>
+
       {/* History Dialog */}
       <Dialog open={!!historyTenantId} onOpenChange={(open) => !open && setHistoryTenantId(null)}>
-        <DialogContent className="sm:max-w-2xl h-[85vh] flex flex-col p-0 gap-0 [&>button]:text-primary-foreground [&>button]:hover:opacity-100">
-          <DialogHeader className="flex-none bg-gradient-to-r from-slate-700 to-slate-800 text-white p-4 pb-3">
-            <DialogTitle className="flex items-center gap-2.5 text-white">
-              <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center">
-                <History className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-base font-semibold leading-tight">
-                  {historyTenantId && tenants.find(t => t.id === historyTenantId)?.name}
-                </p>
-                <p className="text-[11px] font-medium opacity-75 mt-0.5">
-                  Room {historyTenantId && tenants.find(t => t.id === historyTenantId)?.roomNumber} • Payment History
-                </p>
-              </div>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto px-4 py-4">
-            {historyTenantId && tenants.find(t => t.id === historyTenantId) && (
-              <HistoryView tenant={tenants.find(t => t.id === historyTenantId)!} />
-            )}
-          </div>
+        <DialogContent className="sm:max-w-2xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden [&>button]:text-primary-foreground [&>button]:hover:opacity-100">
+          <motion.div
+            className="flex flex-col h-full w-full bg-card touch-pan-y"
+            drag="x"
+            dragDirectionLock
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.9}
+            onDragEnd={(e, info) => {
+              const { offset, velocity } = info;
+              if (
+                (Math.abs(offset.x) > 30 || Math.abs(velocity.x) > 0.4) &&
+                Math.abs(offset.x) > Math.abs(offset.y)
+              ) {
+                setHistoryTenantId(null);
+              }
+            }}
+          >
+            <DialogHeader className="flex-none bg-gradient-to-r from-slate-700 to-slate-800 text-white p-4 pb-3">
+              <DialogTitle className="flex items-center gap-2.5 text-white">
+                <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center">
+                  <HistoryIcon className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-base font-semibold leading-tight">
+                    {historyTenantId && tenants.find(t => t.id === historyTenantId)?.name}
+                  </p>
+                  <p className="text-[11px] font-medium opacity-75 mt-0.5">
+                    Room {historyTenantId && tenants.find(t => t.id === historyTenantId)?.roomNumber} • Payment History
+                  </p>
+                </div>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              {historyTenantId && tenants.find(t => t.id === historyTenantId) && (
+                <HistoryView tenant={tenants.find(t => t.id === historyTenantId)!} />
+              )}
+            </div>
+          </motion.div>
         </DialogContent>
       </Dialog>
     </div>

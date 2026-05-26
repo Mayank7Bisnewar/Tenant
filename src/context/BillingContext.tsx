@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
-import { PaymentRecord, Tenant, BillData, AppState } from '@/types/tenant';
+import { format } from 'date-fns';
+import { PaymentRecord, Tenant, BillData, AppState, MessageSettings } from '@/types/tenant';
 import { useTenants } from '@/hooks/useTenants';
 import { useOwnerInfo } from '@/hooks/useOwnerInfo';
+import { useMessageSettings } from '@/hooks/useMessageSettings';
 import { useAuth } from './AuthContext';
 import { firestoreService } from '@/lib/firestoreService';
 
@@ -31,6 +33,7 @@ interface BillingContextType {
   setBillingDate: (date: Date) => void;
 
   // Calculated values
+  electricityRate: number;
   electricityCharges: number;
   totalAmount: number;
 
@@ -38,11 +41,18 @@ interface BillingContextType {
   ownerInfo: { name: string; mobileNumber: string; upiId: string };
   setOwnerInfo: (info: { name: string; mobileNumber: string; upiId: string }) => void;
 
+  // Message settings
+  messageSettings: MessageSettings;
+  setMessageSettings: (settings: MessageSettings) => void;
+
   // Bill generation
   generateBillData: () => BillData | null;
   generateBillDataForTenant: (tenantId: string) => BillData | null;
   getTenantBillingState: (tenantId: string) => { electricityUnits: number; extraCharges: number; billingDate: Date };
   resetBill: () => void;
+  resetTenantBillData: (tenantId: string) => void;
+  generateBillMessage: (tenant: Tenant, data: BillData | PaymentRecord) => string;
+  getWhatsappLink: (tenant: Tenant, data: BillData | PaymentRecord) => string;
 }
 
 const BillingContext = createContext<BillingContextType | undefined>(undefined);
@@ -51,6 +61,7 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
   const { tenants: allTenants, addTenant, updateTenant, deleteTenant: deleteTenantBase, permanentDeleteTenant, getTenant, reorderTenants: reorderTenantsBase } = useTenants();
   const tenants = allTenants.filter(t => t.status === 'active');
   const { ownerInfo, setOwnerInfo } = useOwnerInfo();
+  const { messageSettings, setMessageSettings } = useMessageSettings();
 
   // App state
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
@@ -157,7 +168,8 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
   }, [selectedTenantId, updateBillingState]);
 
   // Calculated values
-  const electricityCharges = electricityUnits * ELECTRICITY_RATE;
+  const electricityRate = ownerInfo.electricityRate !== undefined ? ownerInfo.electricityRate : 12;
+  const electricityCharges = electricityUnits * electricityRate;
   const totalAmount = selectedTenant
     ? selectedTenant.monthlyRent + electricityCharges + selectedTenant.waterBill + extraCharges
     : 0;
@@ -172,22 +184,23 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
       mobileNumber: selectedTenant.mobileNumber,
       monthlyRent: selectedTenant.monthlyRent,
       electricityUnits,
-      electricityRate: ELECTRICITY_RATE,
+      electricityRate,
       electricityCharges,
       waterBill: selectedTenant.waterBill,
       extraCharges,
       totalAmount,
       billingDate,
     };
-  }, [selectedTenant, electricityUnits, electricityCharges, extraCharges, totalAmount, billingDate]);
+  }, [selectedTenant, electricityUnits, electricityCharges, extraCharges, totalAmount, billingDate, electricityRate]);
 
   // Helper to generate bill data for ANY tenant, not just selected
   const generateBillDataForTenant = useCallback((tenantId: string): BillData | null => {
     const tenant = getTenant(tenantId);
     if (!tenant) return null;
 
+    const rate = ownerInfo.electricityRate !== undefined ? ownerInfo.electricityRate : 12;
     const state = billingState[tenantId] || { electricityUnits: 0, extraCharges: 0, billingDate: new Date() };
-    const elecCharges = state.electricityUnits * ELECTRICITY_RATE;
+    const elecCharges = state.electricityUnits * rate;
     const total = tenant.monthlyRent + elecCharges + tenant.waterBill + state.extraCharges;
 
     return {
@@ -197,14 +210,14 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
       mobileNumber: tenant.mobileNumber,
       monthlyRent: tenant.monthlyRent,
       electricityUnits: state.electricityUnits,
-      electricityRate: ELECTRICITY_RATE,
+      electricityRate: rate,
       electricityCharges: elecCharges,
       waterBill: tenant.waterBill,
       extraCharges: state.extraCharges,
       totalAmount: total || 0,
       billingDate: state.billingDate instanceof Date ? state.billingDate : new Date(state.billingDate),
     };
-  }, [getTenant, billingState]);
+  }, [getTenant, billingState, ownerInfo]);
 
   const addPaymentRecord = useCallback((tenantId: string, record: Omit<PaymentRecord, 'id'>) => {
     const recordId = crypto.randomUUID();
@@ -242,9 +255,66 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
     }
   }, [selectedTenantId, updateBillingState]);
 
+  const resetTenantBillData = useCallback((tenantId: string) => {
+    updateBillingState(tenantId, { electricityUnits: 0, extraCharges: 0, billingDate: new Date() });
+  }, [updateBillingState]);
+
   const getTenantBillingState = useCallback((tenantId: string) => {
     return billingState[tenantId] || { electricityUnits: 0, extraCharges: 0, billingDate: new Date() };
   }, [billingState]);
+
+  const generateBillMessage = useCallback((tenant: Tenant, data: BillData | PaymentRecord) => {
+    const isBillData = 'tenantName' in data;
+    const dateStr = isBillData 
+      ? (data.billingDate instanceof Date ? format(data.billingDate, 'MMMM yyyy') : format(new Date(data.billingDate), 'MMMM yyyy'))
+      : data.billingMonth;
+    
+    const amount = isBillData ? data.totalAmount : data.amount;
+    const electricityCharges = isBillData ? data.electricityCharges : data.electricityAmount;
+    const waterBill = isBillData ? data.waterBill : data.waterAmount;
+    const extraCharges = isBillData ? data.extraCharges : data.extraAmount;
+
+    let message = `*${messageSettings.headerText}*\n\n`;
+    message += `Hello ${tenant.name},\n\n`;
+    message += `Here are the bill details for ${dateStr}:\n\n`;
+    
+    if (messageSettings.includeRent) {
+      message += `Monthly Rent: ₹${tenant.monthlyRent.toLocaleString()}\n`;
+    }
+    if (messageSettings.includeElectricity && electricityCharges > 0) {
+      message += `Electricity: ₹${electricityCharges.toLocaleString()}\n`;
+    }
+    if (messageSettings.includeWater && waterBill > 0) {
+      message += `Water: ₹${waterBill.toLocaleString()}\n`;
+    }
+    if (messageSettings.includeExtra && extraCharges > 0) {
+      message += `Extra Charges: ₹${extraCharges.toLocaleString()}\n`;
+    }
+    
+    if (messageSettings.includeTotal) {
+      message += `\n *Total Payable Amount: ₹${amount.toLocaleString()}*\n`;
+    }
+
+    if (ownerInfo.name || ownerInfo.upiId || ownerInfo.mobileNumber) {
+      message += `\n---\n`;
+      if (ownerInfo.name) message += `Landlord: ${ownerInfo.name}\n`;
+      if (ownerInfo.upiId) message += `UPI ID: ${ownerInfo.upiId}\n`;
+      if (ownerInfo.mobileNumber) message += `Mobile: ${ownerInfo.mobileNumber}\n`;
+    }
+
+    if (messageSettings.customText) {
+      message += `\n*${messageSettings.customText}*`;
+    }
+
+    return message;
+  }, [messageSettings, ownerInfo]);
+
+  const getWhatsappLink = useCallback((tenant: Tenant, data: BillData | PaymentRecord) => {
+    const message = generateBillMessage(tenant, data);
+    const encodedMessage = encodeURIComponent(message);
+    const phoneNumber = (tenant.mobileNumber || '').replace(/\D/g, '');
+    return `whatsapp://send?phone=91${phoneNumber}&text=${encodedMessage}`;
+  }, [generateBillMessage]);
 
   return (
     <BillingContext.Provider
@@ -267,14 +337,20 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
         setExtraCharges,
         billingDate,
         setBillingDate,
+        electricityRate,
         electricityCharges,
         totalAmount,
         ownerInfo,
         setOwnerInfo,
+        messageSettings,
+        setMessageSettings,
         generateBillData,
         generateBillDataForTenant,
         getTenantBillingState,
         resetBill,
+        resetTenantBillData,
+        generateBillMessage,
+        getWhatsappLink,
       }}
     >
       {children}

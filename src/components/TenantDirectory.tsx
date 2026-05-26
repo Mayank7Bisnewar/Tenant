@@ -42,27 +42,38 @@ export function TenantDirectory() {
     };
 
     return (
-        <div className="flex-1 flex flex-col min-h-0 py-4 gap-4 overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 py-1 gap-2 overflow-visible">
             {/* Header & Search - Fixed */}
             <div className="flex-none space-y-4">
-                <div>
-                    <h2 className="text-2xl font-display font-semibold text-foreground">Tenant Directory</h2>
-                    <p className="text-sm text-muted-foreground font-medium">Manage and contact your residents</p>
-                </div>
 
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <div className="relative overflow-visible">
+                    <button
+                        type="button"
+                        className="absolute left-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-full z-10"
+                        aria-label="Search"
+                        onClick={() => {
+                          // Focus the input when button clicked
+                          const input = document.querySelector('#tenant-directory-search');
+                          if (input) (input as HTMLElement).focus();
+                        }}
+                    >
+                        <Search className="w-5 h-5" />
+                    </button>
                     <Input
+                        id="tenant-directory-search"
                         placeholder="Search by name, room, or mobile..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9 h-11 bg-card border-none shadow-sm focus-visible:ring-primary transition-all rounded-xl font-medium"
+                        className="pl-10 h-11 bg-card border-none shadow-sm focus-visible:ring-primary transition-all rounded-xl font-medium"
                     />
                 </div>
             </div>
 
             {/* List - Scrollable Area */}
-            <div className="flex-1 overflow-y-auto space-y-6 pb-4">
+            <div
+                className="flex-1 overflow-y-auto overflow-x-visible space-y-6"
+                style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 70px)' }}
+            >
                 {/* Active Tenants Section */}
                 <div className="space-y-4">
                     {filteredActive.length === 0 && searchQuery && (
@@ -72,7 +83,7 @@ export function TenantDirectory() {
                     )}
 
                     {filteredActive.map((tenant) => (
-                        <Card key={tenant.id} className="group overflow-hidden border-none shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl bg-card active:scale-[0.99]">
+                        <Card key={tenant.id} className="group overflow-visible border-none shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl bg-card active:scale-[0.99] relative z-10">
                             <CardContent className="p-0">
                                 <div className="p-5 flex flex-col gap-4">
                                     <div className="flex items-start justify-between">
@@ -153,7 +164,7 @@ export function TenantDirectory() {
                         </div>
 
                         {filteredDeleted.map((tenant) => (
-                            <Card key={tenant.id} className="group overflow-hidden border-none shadow-sm opacity-75 hover:opacity-100 transition-all duration-300 rounded-2xl bg-muted/20 grayscale-[0.5] hover:grayscale-0">
+                            <Card key={tenant.id} className="group overflow-visible border-none shadow-sm opacity-75 hover:opacity-100 transition-all duration-300 rounded-2xl bg-muted/20 grayscale-[0.5] hover:grayscale-0">
                                 <CardContent className="p-0">
                                     <div className="p-5 flex flex-col gap-4">
                                         <div className="flex items-start justify-between">

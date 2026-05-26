@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { MessageSquare, IndianRupee, Home, Zap, Droplets, PlusCircle, Calendar, User, Settings, CheckSquare, History, Save } from 'lucide-react';
+import { MessageSquare, IndianRupee, Home, Zap, Droplets, PlusCircle, Calendar, User, Settings, CheckSquare, History as HistoryIcon, Save, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useBilling } from '@/context/BillingContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,10 +11,13 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { BillData } from '@/types/tenant';
+import { BillData, Tenant, PaymentRecord } from '@/types/tenant';
 import { HistoryView } from '@/components/HistoryView';
 import { GoogleSheetsService } from '@/services/GoogleSheetsService';
 import { useToast } from '@/hooks/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 
 export function BillSummary() {
   const {
@@ -23,12 +27,12 @@ export function BillSummary() {
     generateBillDataForTenant,
     addPaymentRecord,
     updatePaymentRecord,
+    resetTenantBillData,
+    messageSettings,
+    setMessageSettings,
+    getWhatsappLink,
   } = useBilling();
   const { toast } = useToast();
-
-  const [localOwnerInfo, setLocalOwnerInfo] = useState(ownerInfo);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [sheetsUrl, setSheetsUrl] = useState(GoogleSheetsService.getScriptUrl());
 
   // Selection state
   const [selectedTenantIds, setSelectedTenantIds] = useState<Set<string>>(new Set());
@@ -36,21 +40,18 @@ export function BillSummary() {
   const [historyTenantId, setHistoryTenantId] = useState<string | null>(null);
   const [syncingTenants, setSyncingTenants] = useState<Set<string>>(new Set());
 
-  // Sync local state with context when dialog opens
-  React.useEffect(() => {
-    if (isSettingsOpen) {
-      setLocalOwnerInfo(ownerInfo);
+  const handleSendClick = (tenantId: string) => {
+    const data = generateBillDataForTenant(tenantId);
+    if (data) {
+      const tenant = tenants.find(t => t.id === tenantId);
+      if (tenant) {
+        window.open(getWhatsappLink(tenant, data), '_blank');
+        resetTenantBillData(tenantId);
+      }
     }
-  }, [isSettingsOpen, ownerInfo]);
-
-  const handleSaveOwnerInfo = () => {
-    setOwnerInfo(localOwnerInfo);
-    GoogleSheetsService.setScriptUrl(sheetsUrl);
-    setIsSettingsOpen(false);
-    toast({ title: 'Settings saved successfully' });
   };
 
-  const handleRecordPayment = async (tenantId: string) => {
+  const handleSendAndRecord = async (tenantId: string) => {
     const billData = generateBillDataForTenant(tenantId);
     if (!billData) return;
 
@@ -63,13 +64,14 @@ export function BillSummary() {
     );
     const scriptUrl = GoogleSheetsService.getScriptUrl();
 
+    window.open(getWhatsappLink(tenant, billData), '_blank');
+
+    toast({
+      title: 'WhatsApp opened',
+      description: `Please click send in WhatsApp for ${tenant.name}.`,
+    });
+
     if (existingPayment && existingPayment.syncedToSheets) {
-      toast({
-        title: 'Payment already recorded',
-        description: `A payment for ${billingMonth} is already recorded and synced.`,
-        variant: 'default'
-      });
-      window.open(getWhatsappLink(billData), '_blank');
       return;
     }
 
@@ -95,44 +97,42 @@ export function BillSummary() {
       toast({ title: 'Payment recorded locally' });
     }
 
-    window.open(getWhatsappLink(billData), '_blank');
+    resetTenantBillData(tenantId);
 
     if (scriptUrl && (!existingPayment || !existingPayment.syncedToSheets)) {
       setSyncingTenants(prev => new Set(prev).add(tenantId));
-      (async () => {
-        try {
-          await GoogleSheetsService.appendRow({
-            billedDate: format(billData.billingDate, 'dd/MM/yyyy'),
-            paidDate: format(new Date(), 'dd/MM/yyyy'),
-            tenantName: billData.tenantName,
-            roomNo: billData.roomNumber,
-            rent: billData.monthlyRent,
-            electricityUnits: billData.electricityUnits,
-            electricityAmount: billData.electricityCharges,
-            waterAmount: billData.waterBill,
-            extraAmount: billData.extraCharges,
-            totalAmount: billData.totalAmount,
-            remarks: '',
-          });
+      try {
+        await GoogleSheetsService.appendRow({
+          billedDate: format(billData.billingDate, 'dd/MM/yyyy'),
+          paidDate: format(new Date(), 'dd/MM/yyyy'),
+          tenantName: billData.tenantName,
+          roomNo: billData.roomNumber,
+          rent: billData.monthlyRent,
+          electricityUnits: billData.electricityUnits,
+          electricityAmount: billData.electricityCharges,
+          waterAmount: billData.waterBill,
+          extraAmount: billData.extraCharges,
+          totalAmount: billData.totalAmount,
+          remarks: '',
+        });
 
-          if (paymentRecordId) {
-            updatePaymentRecord(tenantId, paymentRecordId, { syncedToSheets: true });
-          }
-        } catch (error) {
-          console.error('Sheets sync error:', error);
-          toast({
-            title: 'Sync failed',
-            description: `Auto-sync failed for ${billData.tenantName}. You can retry later.`,
-            variant: 'destructive'
-          });
-        } finally {
-          setSyncingTenants(prev => {
-            const next = new Set(prev);
-            next.delete(tenantId);
-            return next;
-          });
+        if (paymentRecordId) {
+          updatePaymentRecord(tenantId, paymentRecordId, { syncedToSheets: true });
         }
-      })();
+      } catch (error) {
+        console.error('Sheets sync error:', error);
+        toast({
+          title: 'Sync failed',
+          description: `Auto-sync failed for ${billData.tenantName}. You can retry later.`,
+          variant: 'destructive'
+        });
+      } finally {
+        setSyncingTenants(prev => {
+          const next = new Set(prev);
+          next.delete(tenantId);
+          return next;
+        });
+      }
     }
   };
 
@@ -163,33 +163,7 @@ export function BillSummary() {
     return total;
   }, [selectedTenantIds, generateBillDataForTenant]);
 
-  const getWhatsappLink = (billData: BillData) => {
-    const formattedDate = format(billData.billingDate, 'MMMM yyyy');
-    let message = `Hello ${billData.tenantName},\n\n`;
-    message += `Here are the bill details for ${formattedDate}:\n\n`;
-    if (billData.extraCharges > 0) {
-      message += `Extra Charges: ₹${billData.extraCharges.toLocaleString()}\n`;
-    }
-    message += `\n *Total Payable Amount: ₹${billData.totalAmount.toLocaleString()}*\n`;
-    if (ownerInfo.name || ownerInfo.upiId || ownerInfo.mobileNumber) {
-      message += `\n---\n`;
-      if (ownerInfo.name) message += `Owner Name: ${ownerInfo.name}\n`;
-      if (ownerInfo.upiId) message += `UPI ID: ${ownerInfo.upiId}\n`;
-      if (ownerInfo.mobileNumber) message += `Mobile: ${ownerInfo.mobileNumber}\n`;
-    }
-    message += `\n*Please ensure the surroundings and toilets are kept clean. Let’s maintain hygiene together. Thank you.*`;
-    const encodedMessage = encodeURIComponent(message);
-    const phoneNumber = (billData.mobileNumber || '').replace(/\D/g, '');
-    if (!phoneNumber) return ''; // Fallback
-    return `whatsapp://send?phone=91${phoneNumber}&text=${encodedMessage}`;
-  };
 
-  const handleSendClick = (tenantId: string) => {
-    const data = generateBillDataForTenant(tenantId);
-    if (data) {
-      window.open(getWhatsappLink(data), '_blank');
-    }
-  };
 
   if (tenants.length === 0) {
     return (
@@ -206,7 +180,10 @@ export function BillSummary() {
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 py-4 gap-4 overflow-hidden">
+    <div 
+      className="flex-1 flex flex-col min-h-0 pt-4 gap-4 overflow-hidden"
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 85px)' }}
+    >
       <Card className="flex-1 flex flex-col min-h-0 shadow-card overflow-hidden">
         {/* Header - Fixed */}
         <CardHeader className="flex-none bg-gradient-to-r from-primary to-primary-dark text-primary-foreground py-4">
@@ -215,100 +192,7 @@ export function BillSummary() {
               <CheckSquare className="w-5 h-5" />
               Select Tenants
             </CardTitle>
-            <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-              <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/10">
-                  <Settings className="w-5 h-5" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle className="font-display">Owner Information</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="ownerName">Owner Name</Label>
-                    <Input
-                      id="ownerName"
-                      placeholder="Your name"
-                      value={localOwnerInfo.name}
-                      onChange={(e) => setLocalOwnerInfo({ ...localOwnerInfo, name: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ownerMobile">Mobile Number</Label>
-                    <Input
-                      id="ownerMobile"
-                      type="text"
-                      inputMode="tel"
-                      pattern="[0-9]*"
-                      autoComplete="off"
-                      autoCorrect="off"
-                      autoCapitalize="none"
-                      spellCheck="false"
-                      placeholder="Your mobile number"
-                      value={localOwnerInfo.mobileNumber}
-                      onChange={(e) => setLocalOwnerInfo({ ...localOwnerInfo, mobileNumber: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="upiId">UPI ID</Label>
-                    <Input
-                      id="upiId"
-                      placeholder="yourname@upi"
-                      value={localOwnerInfo.upiId}
-                      onChange={(e) => setLocalOwnerInfo({ ...localOwnerInfo, upiId: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2 pt-4 border-t">
-                    <Label htmlFor="sheetsUrl">Google Sheets Script URL (Optional)</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="sheetsUrl"
-                        placeholder="https://script.google.com/..."
-                        value={sheetsUrl}
-                        onChange={(e) => setSheetsUrl(e.target.value)}
-                      />
-                      {sheetsUrl && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={async () => {
-                            try {
-                              await GoogleSheetsService.appendRow({
-                                billedDate: '01/01/2024',
-                                paidDate: '01/01/2024',
-                                tenantName: 'TEST',
-                                roomNo: 'TEST',
-                                rent: 0,
-                                electricityUnits: 0,
-                                electricityAmount: 0,
-                                waterAmount: 0,
-                                extraAmount: 0,
-                                totalAmount: 0,
-                                remarks: 'Connection Test',
-                              });
-                              toast({ title: 'Test successful! Check your sheet.' });
-                            } catch (error) {
-                              toast({ title: 'Test failed', variant: 'destructive' });
-                            }
-                          }}
-                        >
-                          Test
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <DialogClose asChild>
-                    <Button variant="outline">Cancel</Button>
-                  </DialogClose>
-                  <Button onClick={handleSaveOwnerInfo}>Save</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+
           </div>
         </CardHeader>
 
@@ -375,7 +259,7 @@ export function BillSummary() {
                       setHistoryTenantId(tenant.id);
                     }}
                   >
-                    <History className="w-4 h-4 text-muted-foreground" />
+                    <HistoryIcon className="w-4 h-4 text-muted-foreground" />
                   </Button>
                   <div className="font-semibold text-primary whitespace-nowrap">
                     ₹{billData.totalAmount.toLocaleString()}
@@ -434,25 +318,21 @@ export function BillSummary() {
                   <div className="flex gap-2">
                     <Button
                       size="sm"
-                      variant={isSynced ? "secondary" : "outline"}
-                      onClick={() => handleRecordPayment(id)}
-                      disabled={isSynced || isSyncing}
-                      className={cn("h-8 rounded-lg", !isSynced && !existingPayment && "border-primary text-primary hover:bg-primary/5")}
+                      className={cn(
+                        "h-8 rounded-lg px-4 min-w-[80px]",
+                        isSynced ? "bg-slate-100 text-slate-600 hover:bg-slate-200" : "bg-[#25D366] hover:bg-[#128C7E] text-white"
+                      )}
+                      onClick={() => handleSendAndRecord(id)}
+                      disabled={isSyncing}
                     >
                       {isSyncing ? (
-                        <span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
                       ) : isSynced ? (
-                        <CheckSquare className="w-4 h-4 text-green-500" />
+                        <CheckSquare className="w-4 h-4 mr-2" />
                       ) : (
-                        <Save className="w-4 h-4" />
+                        <MessageSquare className="w-4 h-4 mr-2" />
                       )}
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="h-8 bg-[#25D366] hover:bg-[#128C7E] text-white rounded-lg px-4"
-                      onClick={() => handleSendClick(id)}
-                    >
-                      Send
+                      {isSynced ? "Resend" : "Send"}
                     </Button>
                   </div>
                 </div>
@@ -469,27 +349,46 @@ export function BillSummary() {
 
       {/* History Dialog */}
       <Dialog open={!!historyTenantId} onOpenChange={(open) => !open && setHistoryTenantId(null)}>
-        <DialogContent className="sm:max-w-2xl h-[85vh] flex flex-col p-0 gap-0 [&>button]:text-primary-foreground [&>button]:hover:opacity-100">
-          <DialogHeader className="flex-none bg-gradient-to-r from-slate-700 to-slate-800 text-white p-4 pb-3">
-            <DialogTitle className="flex items-center gap-2.5 text-white">
-              <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center">
-                <History className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-base font-semibold leading-tight">
-                  {historyTenantId && tenants.find(t => t.id === historyTenantId)?.name}
-                </p>
-                <p className="text-[11px] font-medium opacity-75 mt-0.5">
-                  Room {historyTenantId && tenants.find(t => t.id === historyTenantId)?.roomNumber} • Payment History
-                </p>
-              </div>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto px-4 py-4">
-            {historyTenantId && (
-              <HistoryView tenant={tenants.find(t => t.id === historyTenantId)!} />
-            )}
-          </div>
+        <DialogContent className="sm:max-w-2xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden [&>button]:text-primary-foreground [&>button]:hover:opacity-100">
+          <motion.div
+            className="flex flex-col h-full w-full bg-card touch-pan-y"
+            drag="x"
+            dragDirectionLock
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.9}
+            onDragEnd={(e, info) => {
+              const { offset, velocity } = info;
+              // Check for horizontal swipe (either direction)
+              // Threshold 30px or quick flick (velocity 0.4)
+              if (
+                (Math.abs(offset.x) > 30 || Math.abs(velocity.x) > 0.4) &&
+                Math.abs(offset.x) > Math.abs(offset.y)
+              ) {
+                setHistoryTenantId(null);
+              }
+            }}
+          >
+            <DialogHeader className="flex-none bg-gradient-to-r from-slate-700 to-slate-800 text-white p-4 pb-3">
+              <DialogTitle className="flex items-center gap-2.5 text-white">
+                <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center">
+                  <HistoryIcon className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-base font-semibold leading-tight">
+                    {historyTenantId && tenants.find(t => t.id === historyTenantId)?.name}
+                  </p>
+                  <p className="text-[11px] font-medium opacity-75 mt-0.5">
+                    Room {historyTenantId && tenants.find(t => t.id === historyTenantId)?.roomNumber} • Payment History
+                  </p>
+                </div>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              {historyTenantId && (
+                <HistoryView tenant={tenants.find(t => t.id === historyTenantId)!} />
+              )}
+            </div>
+          </motion.div>
         </DialogContent>
       </Dialog>
     </div>

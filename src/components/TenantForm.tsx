@@ -78,7 +78,7 @@ export function TenantForm({
         <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
                 <Label htmlFor="name" className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-muted-foreground" />
+                    <User className="w-4 h-4 text-blue-500" />
                     Tenant Name
                 </Label>
                 <Input
@@ -93,7 +93,7 @@ export function TenantForm({
 
             <div className="space-y-2">
                 <Label htmlFor="roomNumber" className="flex items-center gap-2">
-                    <Home className="w-4 h-4 text-muted-foreground" />
+                    <Home className="w-4 h-4 text-violet-500" />
                     Room / Flat Number
                 </Label>
                 <Input
@@ -106,7 +106,7 @@ export function TenantForm({
 
             <div className="space-y-2">
                 <Label htmlFor="mobileNumber" className="flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-muted-foreground" />
+                    <Phone className="w-4 h-4 text-emerald-500" />
                     Mobile Number (WhatsApp)
                 </Label>
                 <div className="flex gap-2">
@@ -163,7 +163,7 @@ export function TenantForm({
                             }
                         }}
                     >
-                        <Contact className="w-4 h-4" />
+                        <Contact className="w-4 h-4 text-emerald-600" />
                     </Button>
                 </div>
                 {errors.mobileNumber && <p className="text-sm text-destructive">{errors.mobileNumber}</p>}
@@ -172,7 +172,7 @@ export function TenantForm({
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label htmlFor="monthlyRent" className="flex items-center gap-2">
-                        <IndianRupee className="w-4 h-4 text-muted-foreground" />
+                        <IndianRupee className="w-4 h-4 text-amber-500" />
                         Monthly Rent
                     </Label>
                     <Input
@@ -190,7 +190,7 @@ export function TenantForm({
 
                 <div className="space-y-2">
                     <Label htmlFor="waterBill" className="flex items-center gap-2">
-                        <Droplets className="w-4 h-4 text-muted-foreground" />
+                        <Droplets className="w-4 h-4 text-sky-500" />
                         Water Bill
                     </Label>
                     <Input
