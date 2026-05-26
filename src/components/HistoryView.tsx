@@ -1,7 +1,7 @@
 import React from 'react';
 import { PaymentRecord, Tenant } from '@/types/tenant';
 import { format, parseISO } from 'date-fns';
-import { History, Trash2, Calendar, Droplets, Zap, Home, Plus, Receipt, Clock } from 'lucide-react';
+import { History, Trash2, Calendar, Droplets, Zap, Home, Plus, Receipt, Clock, MessageSquare } from 'lucide-react';
 import { useBilling } from '@/context/BillingContext';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -13,13 +13,18 @@ interface HistoryViewProps {
 }
 
 export function HistoryView({ tenant }: HistoryViewProps) {
-    const { deletePaymentRecord } = useBilling();
+    const { deletePaymentRecord, getWhatsappLink } = useBilling();
     const history = tenant.paymentHistory || [];
 
     // Sort by date descending
     const sortedHistory = [...history].sort((a, b) =>
         new Date(b.date).getTime() - new Date(a.date).getTime()
     );
+
+    const handleResend = (record: PaymentRecord) => {
+        const link = getWhatsappLink(tenant, record);
+        window.open(link, '_blank');
+    };
 
     if (sortedHistory.length === 0) {
         return (
@@ -83,9 +88,18 @@ export function HistoryView({ tenant }: HistoryViewProps) {
                                     )}>
                                         ₹{record.amount.toLocaleString()}
                                     </span>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10 rounded-full" 
+                                        onClick={() => handleResend(record)}
+                                        title="Resend Bill"
+                                    >
+                                        <MessageSquare className="w-3.5 h-3.5" />
+                                    </Button>
                                     <AlertDialog>
                                         <AlertDialogTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full ">
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full" title="Delete Record">
                                                 <Trash2 className="w-3.5 h-3.5" />
                                             </Button>
                                         </AlertDialogTrigger>

@@ -14,6 +14,7 @@ const defaultOwner: OwnerInfo = {
   name: '',
   mobileNumber: '',
   upiId: '',
+  electricityRate: 12,
 };
 
 export function useOwnerInfo() {

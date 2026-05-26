@@ -43,7 +43,8 @@ export interface BillData {
 export interface OwnerInfo {
   name: string;
   mobileNumber: string;
-  upiId: string;
+  upiId?: string;
+  electricityRate?: number;
 }
 
 export interface AppState {
@@ -51,4 +52,13 @@ export interface AppState {
   electricityUnits: number;
   extraCharges: number;
   billingDate: Date;
+}
+export interface MessageSettings {
+  includeRent: boolean;
+  includeElectricity: boolean;
+  includeWater: boolean;
+  includeExtra: boolean;
+  includeTotal: boolean;
+  headerText: string;
+  customText: string;
 }

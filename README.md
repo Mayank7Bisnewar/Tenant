@@ -15,6 +15,7 @@ This project is built using:
 - **Styling**: Tailwind CSS & shadcn/ui
 - **Mobile Integration**: Capacitor
 --- 
+
 ## Install dependencies: For first time setup
 
 ```bash
