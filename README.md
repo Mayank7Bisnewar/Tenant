@@ -1,9 +1,9 @@
 <h1 align="center">
-BISNEWAR RESIDENCE
+TENANT APP
 </h1>
 
 ```bash
-A powerful and professional rent management application designed to handle tenants, billing, and WhatsApp messaging with ease.
+A tenant and bill management application designed to handle tenants, billing, and WhatsApp messaging with ease.
 ```
 
 ## Technologies Used
